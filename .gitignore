@@ -1,0 +1,13 @@
+.vercel
+.env
+.env.local
+.env.*.local
+node_modules/
+*.log
+_backup_portfolio/
+
+# Arquivos gerados e configurações privadas
+dist/
+*.tsbuildinfo
+.env.*
+!.env.example
