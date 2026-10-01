@@ -22,6 +22,8 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       assert.equal(body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
       assert.deepEqual(body.generationConfig.responseFormat.text.schema, geminiSchema);
       assert.equal('responseJsonSchema' in body.generationConfig, false);
+      for (const key of ['temperature', 'topP', 'topK', 'candidateCount'])
+        assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini 3.8`);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
       return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(result()) }] } }] }) };
     }, ...overrides });
@@ -77,4 +79,16 @@ test('provider diagnostics never expose raw body or secrets', async () => {
 test('invalid API key displays specific guidance', async () => {
   const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400, json: async () => ({ error: { details: [{ reason: 'API_KEY_INVALID' }] } }) }) });
   assert.match(res.value.error, /chave Gemini foi recusada/);
+});
+test('unsupported generation parameters have safe actionable diagnostics', async () => {
+  const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400,
+    json: async () => ({ error: { message: `temperature unsupported ${env.GEMINI_API_KEY}` } }) }) });
+  assert.match(res.value.error, /parâmetro de geração/);
+  assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);
+});
+test('region and billing failures are not confused with malformed request', async () => {
+  for (const [message, expected] of [['User location is not supported', /região do servidor/], ['Free tier is not available; enable billing', /faturamento/]]) {
+    const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400, json: async () => ({ error: { message } }) }) });
+    assert.match(res.value.error, expected);
+  }
 });

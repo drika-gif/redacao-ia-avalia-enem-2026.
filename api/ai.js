@@ -28,7 +28,7 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
         body: JSON.stringify({ systemInstruction: { parts: [{ text: instruction }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 12000,
+          generationConfig: { maxOutputTokens: 12000,
             responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: geminiSchema } } } })
       });
       if (!response.ok) {
@@ -36,6 +36,8 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         let details;
         try { details = await response.json(); } catch {}
         const reasons = details?.error?.details?.map(d => d.reason) || [];
+        // Classify known provider errors without returning or logging its raw text.
+        const providerMessage = typeof details?.error?.message === 'string' ? details.error.message : '';
         let message;
         if (reasons.includes('API_KEY_INVALID') || reasons.includes('API_KEY_EXPIRED'))
           message = 'A chave Gemini foi recusada. Confira GEMINI_API_KEY na Vercel e republique.';
@@ -45,8 +47,17 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
           message = 'O modelo Gemini não está disponível para esta chave. Confira GEMINI_MODEL na Vercel.';
         else if (response.status === 429)
           message = 'O Gemini atingiu o limite de uso da sua conta. Aguarde e confira a cota no Google AI Studio.';
-        else if (response.status === 400)
-          message = 'O Gemini recusou a configuração da análise (erro 400). Verifique se a atualização mais recente foi publicada.';
+        else if (response.status === 400) {
+          if (/location.*not supported|unsupported.*region/i.test(providerMessage))
+            message = 'O Gemini não está disponível na região do servidor deste aplicativo. A responsável precisa revisar a região de implantação.';
+          else if (/billing|free tier.*not available/i.test(providerMessage))
+            message = 'O Google exige revisão do faturamento deste projeto para usar o Gemini. Confira a situação no Google AI Studio.';
+          else if (/temperature|top[_ ]?p|top[_ ]?k|candidate[_ ]?count/i.test(providerMessage))
+            message = 'O Gemini recusou um parâmetro de geração. Atualize o aplicativo para carregar a correção mais recente.';
+          else if (/schema|response[_ ]?format|mime[_ ]?type/i.test(providerMessage))
+            message = 'O Gemini recusou o formato da resposta. A integração precisa de ajuste; sua transcrição foi preservada.';
+          else message = 'O Gemini recusou a solicitação (erro 400). Sua transcrição foi preservada; a integração precisa ser revisada.';
+        }
         else message = 'O Gemini está indisponível neste momento. Tente novamente mais tarde.';
         console.warn('[IA] Falha no provedor', { status: response.status });
         return res.status(response.status === 429 ? 429 : 502).json({ error: message });
