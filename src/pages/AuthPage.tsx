@@ -33,6 +33,29 @@ export const AuthPage: React.FC = () => {
   const [supabaseKey, setSupabaseKey] = useState('');
   const [copiedSql, setCopiedSql] = useState(false);
 
+  // Detecta se a URL contém erro de autenticação ou link expirado vindo do Supabase
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      const params = new URLSearchParams(hash.replace(/^#/, '') || search.replace(/^\?/, ''));
+      
+      const errorDesc = params.get('error_description');
+      const error = params.get('error');
+
+      if (errorDesc || error) {
+        let msg = decodeURIComponent((errorDesc || error || '').replace(/\+/g, ' '));
+        if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
+          msg = 'O link de recuperação é inválido ou já expirou. Solicite um novo link abaixo.';
+        }
+        setErrorMsg(msg);
+        setTab('esqueci');
+        // Limpa a hash da URL para não manter parâmetros de erro
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    }
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
