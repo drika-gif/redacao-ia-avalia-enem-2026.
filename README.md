@@ -7,13 +7,15 @@
 
 A correção usa o endpoint autenticado `/api/ai`, que envia somente tema e transcrição ao Gemini. A chave fica no servidor. A professora revisa todas as sugestões antes de salvar; o aplicativo não fornece uma nota oficial do Inep. O OCR com Tesseract continua separado e pode falhar em manuscritos, permitindo transcrição manual.
 
-A IA exige `GEMINI_API_KEY`, `GEMINI_MODEL`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` em Production na Vercel. Escolha um modelo Gemini disponível para sua chave com saída estruturada. O código ainda precisa passar por um teste real em produção após cadastrar essas variáveis. `npm run dev` serve apenas o frontend; use o ambiente de funções da Vercel para testar a API.
+A IA exige `GEMINI_API_KEY`, `GEMINI_MODEL`, `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` em Production na Vercel. Escolha um modelo Gemini disponível para sua chave com saída estruturada. A análise real pelo Gemini foi confirmada pela professora em produção em 01/10/2026. `npm run dev` serve apenas o frontend; use o ambiente de funções da Vercel para testar a API.
 
 No projeto Supabase atual, a tabela de correções e o limite de IA já foram aplicados. Para uma instalação nova, use `database/schema.sql` e `database/ai-rate-limit.sql`. O limite é de 20 tentativas por conta a cada hora, inclusive tentativas que falhem no provedor. O modo demonstração salva apenas dados de teste no navegador e não chama a IA.
 
 A confirmação de salvamento de contas reais depende do sucesso da escrita no Supabase. Uma falha mantém a correção na tela e pede nova tentativa, sem declarar que foi salva na nuvem.
 
-Antes de compartilhar, verifique a implantação de produção, cadastro e confirmação de e-mail em outro navegador, análise real, revisão, salvamento e exportação. Investigue e resolva o alerta de site suspeito no Chrome. Não há comprovação de que o alerta tenha sido removido.
+A professora confirmou análise, revisão, salvamento e exportação em produção em 01/10/2026. Às 10h11 (America/Fortaleza), informou a retirada do aviso “Perigoso” e enviou uma captura em que ele já não aparece. Isso registra a observação no navegador dela, sem representar uma auditoria completa de segurança. Cadastro de uma nova professora, confirmação de e-mail e uso em celular ainda precisam de validação independente.
+
+Endereço de produção: https://redacao-ia-avalia-enem-2026.vercel.app/. Para atualizar a cópia no Antigravity, siga [FINALIZAR-ANTIGRAVITY.md](FINALIZAR-ANTIGRAVITY.md).
 
 Para configurar recuperação e confirmação de conta, use a URL pública em Supabase Auth > URL Configuration. O fluxo de redefinição de senha ainda requer validação em produção.
 
