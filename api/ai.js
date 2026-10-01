@@ -29,9 +29,28 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         body: JSON.stringify({ systemInstruction: { parts: [{ text: instruction }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
           generationConfig: { temperature: 0.2, maxOutputTokens: 12000,
-            responseFormat: { text: { mimeType: 'application/json', schema } } } })
+            responseMimeType: 'application/json', responseJsonSchema: schema } })
       });
-      if (!response.ok) return res.status(response.status === 429 ? 429 : 502).json({ error: response.status === 429 ? 'A IA atingiu seu limite de uso. Tente mais tarde.' : 'Não foi possível obter a análise da IA. Tente novamente.' });
+      if (!response.ok) {
+        // Never expose Google's raw error body: it may contain input or credentials.
+        let details;
+        try { details = await response.json(); } catch {}
+        const reasons = details?.error?.details?.map(d => d.reason) || [];
+        let message;
+        if (reasons.includes('API_KEY_INVALID') || reasons.includes('API_KEY_EXPIRED'))
+          message = 'A chave Gemini foi recusada. Confira GEMINI_API_KEY na Vercel e republique.';
+        else if (response.status === 403)
+          message = 'A chave Gemini não tem permissão para esta chamada. Confira as restrições da chave no Google AI Studio.';
+        else if (response.status === 404)
+          message = 'O modelo Gemini não está disponível para esta chave. Confira GEMINI_MODEL na Vercel.';
+        else if (response.status === 429)
+          message = 'O Gemini atingiu o limite de uso da sua conta. Aguarde e confira a cota no Google AI Studio.';
+        else if (response.status === 400)
+          message = 'O Gemini recusou a configuração da análise (erro 400). Verifique se a atualização mais recente foi publicada.';
+        else message = 'O Gemini está indisponível neste momento. Tente novamente mais tarde.';
+        console.warn('[IA] Falha no provedor', { status: response.status });
+        return res.status(response.status === 429 ? 429 : 502).json({ error: message });
+      }
       const payload = await response.json();
       const candidate = payload.candidates?.[0];
       if (candidate?.finishReason !== 'STOP') throw new Error('Resposta incompleta');

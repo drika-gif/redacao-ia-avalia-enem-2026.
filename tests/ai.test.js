@@ -19,6 +19,8 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       called = true;
       assert.equal(opts.headers['x-goog-api-key'], env.GEMINI_API_KEY);
       const body = JSON.parse(opts.body);
+      assert.equal(body.generationConfig.responseMimeType, 'application/json');
+      assert.deepEqual(body.generationConfig.responseJsonSchema, schema);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
       return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(result()) }] } }] }) };
     }, ...overrides });
@@ -53,4 +55,19 @@ test('invalid grades and hallucinated excerpts rejected', () => {
 });
 test('provider failure does not return automatic fallback grades', async () => {
   const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 500 }) }); assert.equal(res.code, 502); assert.equal(res.value.analysis, undefined);
+});
+test('placeholder-only text never calls the provider', async () => {
+  const { res, called } = await invoke({}, { body: { tema: 'Tema', transcricao: '[trecho ilegível]' } });
+  assert.equal(res.code, 400); assert.equal(called, false);
+});
+test('provider diagnostics never expose raw body or secrets', async () => {
+  for (const status of [400, 403, 404, 429]) {
+    const { res } = await invoke({ fetcher: async () => ({ ok: false, status, json: async () => ({ error: { message: env.GEMINI_API_KEY } }) }) });
+    assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);
+    assert.equal(res.code, status === 429 ? 429 : 502);
+  }
+});
+test('invalid API key displays specific guidance', async () => {
+  const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400, json: async () => ({ error: { details: [{ reason: 'API_KEY_INVALID' }] } }) }) });
+  assert.match(res.value.error, /chave Gemini foi recusada/);
 });

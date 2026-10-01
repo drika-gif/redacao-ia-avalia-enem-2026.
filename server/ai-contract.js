@@ -16,7 +16,8 @@ export const schema = object({
 
 export function validateInput(body) {
   if (!body || typeof body.tema !== 'string' || typeof body.transcricao !== 'string' ||
-      !body.tema.trim() || body.tema.length > 1000 || !body.transcricao.trim() || body.transcricao.length > 30000)
+      !body.tema.trim() || body.tema.length > 1000 || !body.transcricao.trim() || body.transcricao.length > 30000 ||
+      !body.transcricao.replace(/\[trecho ilegível\]/gi, '').trim())
     throw new Error('Informe o tema e uma transcrição de até 30 mil caracteres.');
   return { tema: body.tema.trim(), transcricao: body.transcricao.trim() };
 }

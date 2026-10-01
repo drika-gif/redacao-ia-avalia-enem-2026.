@@ -180,7 +180,7 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              disabled={busy || isOcrLoading || !transcricao.trim()}
+              disabled={busy || isOcrLoading || !transcricao.replace(/\[trecho ilegível\]/gi, '').trim()}
               className="bg-brand-700 hover:bg-brand-800 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-xs uppercase tracking-wider transition shadow-sm flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
