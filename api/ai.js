@@ -31,12 +31,9 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
         method: 'POST', signal: AbortSignal.timeout(55000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown, conforme o esquema configurado na API. Limite cada texto a 2000 caracteres.` }] },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown. Respeite este esquema: ${JSON.stringify(evidenceSchema(references))}\nLimite cada texto a 2000 caracteres.` }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify({ ...input, trechosFonte: references }) }] }],
-          // REST TextResponseFormat uses an enum, not the MIME string accepted
-          // by some SDKs. See ai.google.dev/api/generate-content#TextResponseFormat.
-          generationConfig: { maxOutputTokens: 12000,
-            responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: evidenceSchema(references) } } } })
+          generationConfig: { maxOutputTokens: 12000, responseMimeType: 'application/json' } })
       });
       if (!response.ok) {
         // Never expose Google's raw error body: it may contain input or credentials.
@@ -62,7 +59,7 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
             message = 'O Google exige revisão do faturamento deste projeto para usar o Gemini. Confira a situação no Google AI Studio.';
           else if (/temperature|top[_ ]?p|top[_ ]?k|candidate[_ ]?count/i.test(providerMessage))
             message = 'O Gemini recusou um parâmetro de geração. Atualize o aplicativo para carregar a correção mais recente.';
-          else if (/schema|response[_ ]?format|mime[_ ]?type/i.test(providerMessage))
+          else if (/schema|response[_-]?format|responseFormat|mime[_-]?type|responseMimeType/i.test(providerMessage))
             message = 'O Gemini recusou o formato da resposta. A integração precisa de ajuste; sua transcrição foi preservada.';
           else if (/invalid argument|invalid request|malformed|unknown name|unknown field/i.test(providerMessage))
             message = 'O Gemini recusou o conteúdo da chamada (código IA_REQUEST_INVALID). Sua transcrição foi preservada.';

@@ -21,11 +21,10 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       const body = JSON.parse(opts.body);
       const input = JSON.parse(body.contents[0].parts[0].text);
       assert.deepEqual(input.trechosFonte, { E001: 'texto teste' });
-      assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000,
-        responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: evidenceSchema(input.trechosFonte) } } });
-      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(evidenceSchema(input.trechosFonte))), false);
-      for (const key of ['temperature', 'topP', 'topK', 'candidateCount', 'responseMimeType', 'responseSchema', 'responseJsonSchema'])
-        assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini 3.8`);
+      assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000, responseMimeType: 'application/json' });
+      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(evidenceSchema(input.trechosFonte))), true);
+      for (const key of ['temperature', 'topP', 'topK', 'candidateCount', 'responseFormat', 'responseSchema', 'responseJsonSchema'])
+        assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini`);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
       const value = result(); value.c1.trechos[0].trecho = 'E001';
       return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] }) };
@@ -118,6 +117,18 @@ test('unsupported generation parameters have safe actionable diagnostics', async
     json: async () => ({ error: { message: `temperature unsupported ${env.GEMINI_API_KEY}` } }) }) });
   assert.match(res.value.error, /parâmetro de geração/);
   assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);
+});
+test('format and unknown name errors have safe actionable diagnostics', async () => {
+  for (const [msg, pattern] of [
+    ['Invalid JSON payload received. Unknown name "responseFormat" at generation_config', /formato da resposta|conteúdo da chamada/],
+    ['responseMimeType is not supported', /formato da resposta/],
+    ['malformed request payload', /conteúdo da chamada/]
+  ]) {
+    const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400,
+      json: async () => ({ error: { message: `${msg} ${env.GEMINI_API_KEY}` } }) }) });
+    assert.match(res.value.error, pattern);
+    assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);
+  }
 });
 test('region and billing failures are not confused with malformed request', async () => {
   for (const [message, expected] of [['User location is not supported', /região do servidor/], ['Free tier is not available; enable billing', /faturamento/]]) {
