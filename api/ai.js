@@ -153,3 +153,6 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
     }
   };
 }
+
+export default makeHandler();
+
