@@ -26,10 +26,9 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
         method: 'POST', signal: AbortSignal.timeout(55000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: instruction }] },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown. Respeite este esquema: ${JSON.stringify(geminiSchema)}\nLimite cada texto a 2000 caracteres.` }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
-          generationConfig: { maxOutputTokens: 12000,
-            responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: geminiSchema } } } })
+          generationConfig: { maxOutputTokens: 12000 } })
       });
       if (!response.ok) {
         // Never expose Google's raw error body: it may contain input or credentials.
@@ -39,7 +38,8 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         // Classify known provider errors without returning or logging its raw text.
         const providerMessage = typeof details?.error?.message === 'string' ? details.error.message : '';
         let message;
-        if (reasons.includes('API_KEY_INVALID') || reasons.includes('API_KEY_EXPIRED'))
+        if (reasons.includes('API_KEY_INVALID') || reasons.includes('API_KEY_EXPIRED') ||
+            /api.?key.*(not valid|invalid|expired|not found|blocked|leaked)/i.test(providerMessage))
           message = 'A chave Gemini foi recusada. Confira GEMINI_API_KEY na Vercel e republique.';
         else if (response.status === 403)
           message = 'A chave Gemini não tem permissão para esta chamada. Confira as restrições da chave no Google AI Studio.';
@@ -56,7 +56,9 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
             message = 'O Gemini recusou um parâmetro de geração. Atualize o aplicativo para carregar a correção mais recente.';
           else if (/schema|response[_ ]?format|mime[_ ]?type/i.test(providerMessage))
             message = 'O Gemini recusou o formato da resposta. A integração precisa de ajuste; sua transcrição foi preservada.';
-          else message = 'O Gemini recusou a solicitação (erro 400). Sua transcrição foi preservada; a integração precisa ser revisada.';
+          else if (/invalid argument|invalid request|malformed|unknown name|unknown field/i.test(providerMessage))
+            message = 'O Gemini recusou o conteúdo da chamada (código IA_REQUEST_INVALID). Sua transcrição foi preservada.';
+          else message = 'O Gemini recusou a chamada mínima (código IA_PROVIDER_400). A responsável precisa conferir os registros da integração.';
         }
         else message = 'O Gemini está indisponível neste momento. Tente novamente mais tarde.';
         console.warn('[IA] Falha no provedor', { status: response.status });
@@ -66,7 +68,10 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       const candidate = payload.candidates?.[0];
       if (candidate?.finishReason !== 'STOP') throw new Error('Resposta incompleta');
       const raw = candidate.content?.parts?.filter(p => !p.thought).map(p => p.text || '').join('');
-      const analysis = validateResult(JSON.parse(raw), input.transcricao);
+      // Some models wrap JSON in a code fence even when instructed not to.
+      // Accept only a single complete JSON object and keep all semantic checks.
+      const json = raw?.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, '$1');
+      const analysis = validateResult(JSON.parse(json), input.transcricao);
       return res.status(200).json({ analysis, provider: 'Gemini', model: env.GEMINI_MODEL });
     } catch {
       return res.status(502).json({ error: 'A IA não concluiu uma análise válida. Sua transcrição foi preservada; tente novamente.' });

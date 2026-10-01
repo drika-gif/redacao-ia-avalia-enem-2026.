@@ -19,9 +19,8 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       called = true;
       assert.equal(opts.headers['x-goog-api-key'], env.GEMINI_API_KEY);
       const body = JSON.parse(opts.body);
-      assert.equal(body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
-      assert.deepEqual(body.generationConfig.responseFormat.text.schema, geminiSchema);
-      assert.equal('responseJsonSchema' in body.generationConfig, false);
+      assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000 });
+      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(geminiSchema)), true);
       for (const key of ['temperature', 'topP', 'topK', 'candidateCount'])
         assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini 3.8`);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
@@ -91,4 +90,24 @@ test('region and billing failures are not confused with malformed request', asyn
     const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 400, json: async () => ({ error: { message } }) }) });
     assert.match(res.value.error, expected);
   }
+});
+test('minimal call accepts fenced JSON but still rejects invented evidence', async () => {
+  for (const invented of [false, true]) {
+    const value = result();
+    if (invented) value.c1.trechos[0].trecho = 'frase que não existe';
+    const { res } = await invoke({ fetcher: async () => ({ ok: true, json: async () => ({
+      candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '```json\n' + JSON.stringify(value) + '\n```' }] } }]
+    }) }) });
+    assert.equal(res.code, invented ? 502 : 200);
+    if (invented) assert.equal(res.value.analysis, undefined);
+  }
+});
+test('invalid key without structured details is identified and never retried', async () => {
+  let calls = 0;
+  const { res } = await invoke({ fetcher: async () => {
+    calls++;
+    return { ok: false, status: 400, json: async () => ({ error: { message: 'API key not valid. Please pass a valid API key.' } }) };
+  } });
+  assert.equal(calls, 1);
+  assert.match(res.value.error, /chave Gemini foi recusada/);
 });
