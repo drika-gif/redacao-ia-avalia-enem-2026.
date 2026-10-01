@@ -30,6 +30,24 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
   await handler({ method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: { tema: 'Tema', transcricao: 'texto teste' }, ...reqOverride }, res);
   return { res, called };
 };
+test('safe diagnostics distinguish timeout, incomplete JSON, and invalid evidence', async () => {
+  const cases = [
+    [async () => { throw Object.assign(new Error(env.GEMINI_API_KEY), { name: 'TimeoutError' }); }, 'IA_TIMEOUT'],
+    [async () => ({ ok: true, json: async () => ({ candidates: [{ finishReason: 'MAX_TOKENS' }] }) }), 'IA_INCOMPLETE'],
+    [async () => ({ ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: env.GEMINI_API_KEY }] } }] }) }), 'IA_JSON_INVALID'],
+    [async () => { const bad = result(); bad.c1.trechos[0].trecho = 'inventado'; return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(bad) }] } }] }) }; }, 'IA_VALIDATION_FAILED']
+  ];
+  for (const [fetcher, code] of cases) {
+    const logs = [];
+    const { res } = await invoke({ fetcher, logger: { warn: (...args) => logs.push(args) } });
+    assert.equal(res.code, 502);
+    assert.equal(res.value.analysis, undefined);
+    assert.match(res.value.error, new RegExp(code));
+    assert.equal(logs[0][1].code, code);
+    assert.equal(JSON.stringify(logs).includes(env.GEMINI_API_KEY), false);
+    assert.equal(JSON.stringify(logs).includes('texto teste'), false);
+  }
+});
 test('authenticated successful analysis contains no API secret', async () => {
   const { res, called } = await invoke(); assert.equal(res.code, 200); assert.equal(called, true);
   assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);

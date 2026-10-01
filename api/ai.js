@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { geminiSchema, instruction, validateInput, validateResult } from '../server/ai-contract.js';
 
-export function makeHandler({ env = process.env, fetcher = fetch, clientFactory = createClient } = {}) {
+export function makeHandler({ env = process.env, fetcher = fetch, clientFactory = createClient, logger = console } = {}) {
   return async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Método não permitido.' }); }
@@ -13,6 +13,9 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
     if (!env.GEMINI_API_KEY || !env.GEMINI_MODEL || !env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY)
       return res.status(503).json({ error: 'A correção por IA ainda não foi configurada pela responsável pelo aplicativo.' });
     if (!/^[a-zA-Z0-9._-]+$/.test(env.GEMINI_MODEL)) return res.status(503).json({ error: 'Modelo de IA inválido na configuração.' });
+    let stage = 'session';
+    let finishReason = 'MISSING';
+    const started = Date.now();
     try {
       const client = clientFactory(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
         global: { headers: { Authorization: `Bearer ${token}` } },
@@ -23,6 +26,7 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       const limit = await client.rpc('consume_ai_request');
       if (limit.error) return res.status(503).json({ error: 'O serviço de IA está temporariamente indisponível.' });
       if (limit.data !== true) return res.status(429).json({ error: 'Você atingiu o limite de 20 análises por hora. Tente mais tarde.' });
+      stage = 'provider';
       const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
         method: 'POST', signal: AbortSignal.timeout(55000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
@@ -64,17 +68,29 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         console.warn('[IA] Falha no provedor', { status: response.status });
         return res.status(response.status === 429 ? 429 : 502).json({ error: message });
       }
+      stage = 'response';
       const payload = await response.json();
       const candidate = payload.candidates?.[0];
+      finishReason = ['STOP', 'MAX_TOKENS', 'SAFETY', 'RECITATION', 'OTHER'].includes(candidate?.finishReason) ? candidate.finishReason : 'MISSING_OR_OTHER';
+      stage = 'completion';
       if (candidate?.finishReason !== 'STOP') throw new Error('Resposta incompleta');
       const raw = candidate.content?.parts?.filter(p => !p.thought).map(p => p.text || '').join('');
       // Some models wrap JSON in a code fence even when instructed not to.
       // Accept only a single complete JSON object and keep all semantic checks.
       const json = raw?.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, '$1');
-      const analysis = validateResult(JSON.parse(json), input.transcricao);
+      stage = 'json';
+      const parsed = JSON.parse(json);
+      stage = 'validation';
+      const analysis = validateResult(parsed, input.transcricao);
       return res.status(200).json({ analysis, provider: 'Gemini', model: env.GEMINI_MODEL });
-    } catch {
-      return res.status(502).json({ error: 'A IA não concluiu uma análise válida. Sua transcrição foi preservada; tente novamente.' });
+    } catch (error) {
+      const timeout = error?.name === 'TimeoutError' || error?.name === 'AbortError';
+      const code = timeout ? 'IA_TIMEOUT' : stage === 'completion' ? 'IA_INCOMPLETE' : stage === 'json' ? 'IA_JSON_INVALID' : stage === 'validation' ? 'IA_VALIDATION_FAILED' : 'IA_CALL_FAILED';
+      // Only allowlisted metadata: never log provider text, essay, tokens, or credentials.
+      const validationReasons = ['Objeto inválido', 'Campo inesperado', 'Lista inválida', 'Nota inválida', 'Campo inválido', 'Trecho não encontrado na redação', 'Justificativa ausente', 'Trecho vazio', 'Elemento sem evidência'];
+      logger.warn('[IA] Análise não concluída', { code, stage, finishReason, elapsedMs: Date.now() - started,
+        ...(stage === 'validation' && validationReasons.includes(error?.message) ? { reason: error.message } : {}) });
+      return res.status(502).json({ error: `A IA não concluiu uma análise válida (${code}). Sua transcrição foi preservada; tente novamente.` });
     }
   };
 }
