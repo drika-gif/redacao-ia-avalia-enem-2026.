@@ -278,3 +278,72 @@ test('unsupported image format and excessive images rejected before calling Gemi
   assert.equal(resCount.code, 400);
   assert.equal(calledCount, false);
 });
+
+test('image flow tolerates quotation marks, ellipses, and punctuation in cited evidence', async () => {
+  const photoResult = result();
+  photoResult.transcricao = 'No Brasil contemporâneo, a persistência da violência contra a mulher decorre de raízes históricas. Portanto, cabe ao Ministério da Educação implementar campanhas nas escolas.';
+  photoResult.c1.trechos = [
+    { trecho: '“No Brasil contemporâneo”', explicacao: 'Pontuação inicial' },
+    { trecho: '...cabe ao Ministério da Educação...', explicacao: 'Elipse citada' }
+  ];
+  photoResult.c5.quadro.agente = { encontrado: true, trecho: '"Ministério da Educação"', feedback: 'Agente claro' };
+  photoResult.c5.quadro.modo = { encontrado: false, trecho: 'Não identificado', feedback: 'Falta modo' };
+  photoResult.notaZero = { isZeroRisk: false, motivo: '', evidencia: 'N/A', explicacao: '' };
+  photoResult.c1.sugerida = 140; // nota não discreta, deve ser normalizada para 160 ou 120
+  delete photoResult.motivoNovaFoto; // campo ausente
+  delete photoResult.devolutiva.errosCategorizados.argumentacao; // categoria ausente
+
+  const { res } = await invoke({
+    fetcher: async () => ({
+      ok: true,
+      json: async () => ({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: JSON.stringify(photoResult) }] }
+        }]
+      })
+    })
+  }, {
+    body: {
+      tema: 'Violência contra a mulher',
+      imagens: [{ dataUrl: 'data:image/jpeg;base64,Zm90bw==' }]
+    }
+  });
+
+  assert.equal(res.code, 200);
+  assert.equal(res.value.analysis.c1.trechos[0].trecho, 'No Brasil contemporâneo');
+  assert.equal(res.value.analysis.c1.trechos[1].trecho, 'cabe ao Ministério da Educação');
+  assert.equal(res.value.analysis.c5.quadro.agente.trecho, 'Ministério da Educação');
+  assert.equal(res.value.analysis.c5.quadro.modo.trecho, '');
+  assert.equal(res.value.analysis.notaZero.evidencia, '');
+  assert.equal([0, 40, 80, 120, 160, 200].includes(res.value.analysis.c1.sugerida), true);
+  assert.equal(res.value.analysis.precisaNovaFoto, false);
+});
+
+test('unreadable photo transcription requests new photo without zero penalty', async () => {
+  const unreadableResult = result();
+  unreadableResult.transcricao = '[trecho ilegível] [trecho ilegível] foto escura';
+  unreadableResult.precisaNovaFoto = false; // IA não marcou explicitamente
+
+  const { res } = await invoke({
+    fetcher: async () => ({
+      ok: true,
+      json: async () => ({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: JSON.stringify(unreadableResult) }] }
+        }]
+      })
+    })
+  }, {
+    body: {
+      tema: 'Tema',
+      imagens: [{ dataUrl: 'data:image/jpeg;base64,ZXNjdXJh' }]
+    }
+  });
+
+  assert.equal(res.code, 200);
+  assert.equal(res.value.analysis.precisaNovaFoto, true);
+  assert.match(res.value.analysis.motivoNovaFoto, /nitidez/);
+  assert.equal(res.value.analysis.notaZero.isZeroRisk, false);
+});

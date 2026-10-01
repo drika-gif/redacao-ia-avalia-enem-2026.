@@ -139,7 +139,7 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       stage = 'json';
       const parsed = JSON.parse(json);
       stage = 'validation';
-      const analysis = validateResult(parsed, input.transcricao || parsed.transcricao, references);
+      const analysis = validateResult(parsed, input.transcricao || parsed.transcricao, references, { hasImages });
       return res.status(200).json({ analysis, provider: 'Gemini', model: env.GEMINI_MODEL });
     } catch (error) {
       const timeout = error?.name === 'TimeoutError' || error?.name === 'AbortError';

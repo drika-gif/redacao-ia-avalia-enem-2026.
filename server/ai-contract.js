@@ -119,6 +119,179 @@ export function validateInput(body) {
   return { tema: body.tema.trim(), transcricao, imagens };
 }
 
+const VALID_SCORES = [0, 40, 80, 120, 160, 200];
+
+export function normalizeScore(val) {
+  if (typeof val === 'string') val = parseInt(val, 10);
+  if (typeof val !== 'number' || !Number.isFinite(val)) return 120;
+  if (VALID_SCORES.includes(val)) return val;
+  let closest = VALID_SCORES[0];
+  let minDiff = Math.abs(val - closest);
+  for (const s of VALID_SCORES) {
+    const diff = Math.abs(val - s);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = s;
+    }
+  }
+  return closest;
+}
+
+export function matchImageEvidence(s, text) {
+  if (!s || typeof s !== 'string') return '';
+  let cleaned = s.trim()
+    .replace(/^["'“”«»‘’`\s]+|["'“”«»‘’`\s]+$/gu, '')
+    .replace(/^(\.\.\.|…|\[\.\.\.\]|\(\.\.\.\))\s*/gu, '')
+    .replace(/\s*(\.\.\.|…|\[\.\.\.\]|\(\.\.\.\))$/gu, '')
+    .trim();
+
+  if (!cleaned) return '';
+  if (cleaned.toLowerCase() === '[trecho ilegível]' || cleaned.toLowerCase() === 'trecho ilegível') {
+    return '[trecho ilegível]';
+  }
+
+  // 1. Correspondência literal
+  if (text.includes(cleaned)) return cleaned;
+
+  // 2. Correspondência sem diferenciar maiúsculas/minúsculas
+  const lowerText = text.toLowerCase();
+  const lowerCleaned = cleaned.toLowerCase();
+  const idx = lowerText.indexOf(lowerCleaned);
+  if (idx !== -1) return text.slice(idx, idx + cleaned.length);
+
+  // 3. Correspondência tolerante a pontuações e espaçamentos entre palavras
+  const words = cleaned.match(/[\p{L}\p{N}]+/gu) || [];
+  if (words.length > 0) {
+    const escapeRegex = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = words.map(w => escapeRegex(w)).join('(?:[\\s\\p{P}\\p{S}]+)');
+    const match = text.match(new RegExp(pattern, 'ui'));
+    if (match) return match[0];
+  }
+
+  // 4. Subsequência para trechos mais longos (>= 3 palavras)
+  if (words.length >= 3) {
+    const escapeRegex = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const firstAnchor = words.slice(0, 3).map(w => escapeRegex(w)).join('(?:[\\s\\p{P}\\p{S}]+)');
+    const firstMatch = text.match(new RegExp(firstAnchor, 'ui'));
+    if (firstMatch) {
+      const startIdx = firstMatch.index;
+      const candidateSpan = text.slice(startIdx, startIdx + Math.round(cleaned.length * 1.4));
+      const spanWords = candidateSpan.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+      const matchCount = words.filter(w => spanWords.includes(w.toLowerCase())).length;
+      if (matchCount / words.length >= 0.6) {
+        const lastWord = words[words.length - 1].toLowerCase();
+        const lastIdx = candidateSpan.toLowerCase().lastIndexOf(lastWord);
+        if (lastIdx !== -1) {
+          return candidateSpan.slice(0, lastIdx + lastWord.length).trim();
+        }
+        return firstMatch[0];
+      }
+    }
+  }
+
+  return null;
+}
+
+function makeNovaFotoResult(result) {
+  if (typeof result.motivoNovaFoto !== 'string' || !result.motivoNovaFoto.trim()) {
+    result.motivoNovaFoto = 'A foto enviada não permitiu uma avaliação confiável. Por favor, tire outra foto mais nítida e iluminada.';
+  }
+  result.precisaNovaFoto = true;
+  result.transcricao = typeof result.transcricao === 'string' ? result.transcricao : '';
+  result.limitacoesLeitura = typeof result.limitacoesLeitura === 'string' && result.limitacoesLeitura.trim()
+    ? result.limitacoesLeitura
+    : result.motivoNovaFoto;
+  result.notaZero = { isZeroRisk: false, motivo: '', evidencia: '', explicacao: '' };
+  for (const key of ['c1', 'c2', 'c3', 'c4']) {
+    result[key] = { sugerida: 0, justificativa: result.motivoNovaFoto, erros: [], trechos: [], orientacao: 'Capture uma nova foto da redação.' };
+  }
+  result.c5 = {
+    sugerida: 0,
+    justificativa: result.motivoNovaFoto,
+    quadro: {
+      agente: { encontrado: false, trecho: '', feedback: '' },
+      acao: { encontrado: false, trecho: '', feedback: '' },
+      modo: { encontrado: false, trecho: '', feedback: '' },
+      efeito: { encontrado: false, trecho: '', feedback: '' },
+      detalhamento: { encontrado: false, trecho: '', feedback: '' }
+    }
+  };
+  result.devolutiva = {
+    pontosFortes: [],
+    precisaMelhorar: ['Enviar nova foto da redação com boa nitidez e iluminação.'],
+    errosCategorizados: { ortografia: [], pontuacao: [], concordancia: [], estrutura: [], argumentacao: [], coesao: [], propostaDeIntervencao: [] },
+    trechosParaRevisar: []
+  };
+  return result;
+}
+
+function sanitizeImageResult(result) {
+  result.precisaNovaFoto = Boolean(result.precisaNovaFoto);
+  result.motivoNovaFoto = typeof result.motivoNovaFoto === 'string' ? result.motivoNovaFoto.slice(0, 2000) : '';
+  result.limitacoesLeitura = typeof result.limitacoesLeitura === 'string' ? result.limitacoesLeitura.slice(0, 2000) : '';
+  result.transcricao = typeof result.transcricao === 'string' ? result.transcricao.slice(0, 30000) : '';
+
+  result.notaZero = result.notaZero || {};
+  result.notaZero.isZeroRisk = Boolean(result.notaZero.isZeroRisk);
+  result.notaZero.motivo = typeof result.notaZero.motivo === 'string' ? result.notaZero.motivo.slice(0, 2000) : '';
+  result.notaZero.evidencia = typeof result.notaZero.evidencia === 'string' ? result.notaZero.evidencia.slice(0, 2000) : '';
+  result.notaZero.explicacao = typeof result.notaZero.explicacao === 'string' ? result.notaZero.explicacao.slice(0, 2000) : '';
+
+  for (const key of ['c1', 'c2', 'c3', 'c4']) {
+    result[key] = result[key] || {};
+    result[key].sugerida = normalizeScore(result[key].sugerida);
+    result[key].justificativa = typeof result[key].justificativa === 'string' && result[key].justificativa.trim()
+      ? result[key].justificativa.slice(0, 2000)
+      : 'Avaliação da competência realizada a partir da leitura da imagem.';
+    result[key].erros = Array.isArray(result[key].erros) ? result[key].erros.filter(e => typeof e === 'string').slice(0, 12) : [];
+    result[key].trechos = Array.isArray(result[key].trechos)
+      ? result[key].trechos.filter(t => t && typeof t === 'object').slice(0, 8).map(t => ({
+          trecho: typeof t.trecho === 'string' ? t.trecho.slice(0, 2000) : '',
+          explicacao: typeof t.explicacao === 'string' ? t.explicacao.slice(0, 2000) : ''
+        }))
+      : [];
+    result[key].orientacao = typeof result[key].orientacao === 'string' ? result[key].orientacao.slice(0, 2000) : '';
+  }
+
+  result.c5 = result.c5 || {};
+  result.c5.sugerida = normalizeScore(result.c5.sugerida);
+  result.c5.justificativa = typeof result.c5.justificativa === 'string' && result.c5.justificativa.trim()
+    ? result.c5.justificativa.slice(0, 2000)
+    : 'Avaliação da proposta de intervenção realizada a partir da leitura da imagem.';
+  result.c5.quadro = result.c5.quadro || {};
+  for (const elKey of ['agente', 'acao', 'modo', 'efeito', 'detalhamento']) {
+    result.c5.quadro[elKey] = result.c5.quadro[elKey] || {};
+    result.c5.quadro[elKey].encontrado = Boolean(result.c5.quadro[elKey].encontrado);
+    result.c5.quadro[elKey].trecho = typeof result.c5.quadro[elKey].trecho === 'string' ? result.c5.quadro[elKey].trecho.slice(0, 2000) : '';
+    result.c5.quadro[elKey].feedback = typeof result.c5.quadro[elKey].feedback === 'string' ? result.c5.quadro[elKey].feedback.slice(0, 2000) : '';
+  }
+
+  result.devolutiva = result.devolutiva || {};
+  result.devolutiva.pontosFortes = Array.isArray(result.devolutiva.pontosFortes)
+    ? result.devolutiva.pontosFortes.filter(p => typeof p === 'string').slice(0, 12) : [];
+  result.devolutiva.precisaMelhorar = Array.isArray(result.devolutiva.precisaMelhorar)
+    ? result.devolutiva.precisaMelhorar.filter(p => typeof p === 'string').slice(0, 12) : [];
+  
+  result.devolutiva.errosCategorizados = result.devolutiva.errosCategorizados || {};
+  for (const cat of ['ortografia', 'pontuacao', 'concordancia', 'estrutura', 'argumentacao', 'coesao', 'propostaDeIntervencao']) {
+    result.devolutiva.errosCategorizados[cat] = Array.isArray(result.devolutiva.errosCategorizados[cat])
+      ? result.devolutiva.errosCategorizados[cat].filter(e => typeof e === 'string').slice(0, 12) : [];
+  }
+
+  result.devolutiva.trechosParaRevisar = Array.isArray(result.devolutiva.trechosParaRevisar)
+    ? result.devolutiva.trechosParaRevisar.filter(t => t && typeof t === 'object').slice(0, 8).map(t => ({
+        original: typeof t.original === 'string' ? t.original.slice(0, 2000) : '',
+        problema: typeof t.problema === 'string' ? t.problema.slice(0, 2000) : '',
+        orientacao: typeof t.orientacao === 'string' ? t.orientacao.slice(0, 2000) : ''
+      }))
+    : [];
+
+  const allowedRootKeys = Object.keys(schema.properties);
+  for (const k of Object.keys(result)) {
+    if (!allowedRootKeys.includes(k)) delete result[k];
+  }
+}
+
 function validate(value, spec) {
   if (spec.type === 'object') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Objeto inválido');
@@ -132,40 +305,36 @@ function validate(value, spec) {
   } else if (typeof value !== spec.type || (spec.maxLength && value.length > spec.maxLength)) throw new Error('Campo inválido');
 }
 
-export function validateResult(result, transcricao, references) {
+export function validateResult(result, transcricao, references, options = {}) {
   if (!result || typeof result !== 'object') throw new Error('Objeto inválido');
+
+  const hasImages = Boolean(
+    options?.hasImages ||
+    (!references && result?.transcricao && (!transcricao || result.transcricao === transcricao))
+  );
 
   // Caso a foto não possua nitidez suficiente para leitura confiável
   if (result.precisaNovaFoto === true) {
-    if (typeof result.motivoNovaFoto !== 'string' || !result.motivoNovaFoto.trim()) {
-      result.motivoNovaFoto = 'A foto enviada não permitiu uma avaliação confiável. Por favor, tire outra foto mais nítida e iluminada.';
-    }
-    result.transcricao = typeof result.transcricao === 'string' ? result.transcricao : '';
-    result.limitacoesLeitura = typeof result.limitacoesLeitura === 'string' ? result.limitacoesLeitura : result.motivoNovaFoto;
-    result.notaZero = result.notaZero || { isZeroRisk: false, motivo: '', evidencia: '', explicacao: '' };
-    for (const key of ['c1', 'c2', 'c3', 'c4']) {
-      result[key] = result[key] || { sugerida: 0, justificativa: result.motivoNovaFoto, erros: [], trechos: [], orientacao: 'Capture uma nova foto da redação.' };
-    }
-    result.c5 = result.c5 || {
-      sugerida: 0,
-      justificativa: result.motivoNovaFoto,
-      quadro: {
-        agente: { encontrado: false, trecho: '', feedback: '' },
-        acao: { encontrado: false, trecho: '', feedback: '' },
-        modo: { encontrado: false, trecho: '', feedback: '' },
-        efeito: { encontrado: false, trecho: '', feedback: '' },
-        detalhamento: { encontrado: false, trecho: '', feedback: '' }
-      }
-    };
-    result.devolutiva = result.devolutiva || {
-      pontosFortes: [], precisaMelhorar: ['Enviar nova foto da redação com boa nitidez e iluminação.'],
-      errosCategorizados: { ortografia: [], pontuacao: [], concordancia: [], estrutura: [], argumentacao: [], coesao: [], propostaDeIntervencao: [] },
-      trechosParaRevisar: []
-    };
-    return result;
+    return makeNovaFotoResult(result);
   }
 
-  // Foto legível: validação completa do esquema
+  // Se for fluxo de imagem, verificar se a transcrição lida tem substância mínima
+  if (hasImages) {
+    const rawTranscription = typeof result.transcricao === 'string' ? result.transcricao : '';
+    const meaningfulText = rawTranscription.replace(/\[trecho ilegível\]/gi, '').replace(/\s+/g, ' ').trim();
+    const wordTokens = meaningfulText.match(/[\p{L}\p{N}]+/gu) || [];
+    
+    // Se a imagem resultou em texto ilegível ou vazio, solicitar nova foto sem atribuir nota zero à aluna
+    if (meaningfulText.length < 50 || wordTokens.length < 10) {
+      result.precisaNovaFoto = true;
+      result.motivoNovaFoto = result.motivoNovaFoto || 'A foto enviada não permitiu uma leitura com nitidez suficiente para avaliar a redação. Por favor, tire outra foto mais nítida, com boa iluminação e enquadrando a folha inteira.';
+      return makeNovaFotoResult(result);
+    }
+
+    sanitizeImageResult(result);
+  }
+
+  // Foto legível: validação do esquema
   validate(result, schema);
 
   const fullText = (typeof result.transcricao === 'string' && result.transcricao.trim())
@@ -190,21 +359,79 @@ export function validateResult(result, transcricao, references) {
 
   for (const key of ['c1', 'c2', 'c3', 'c4']) {
     if (!result[key].justificativa?.trim()) throw new Error('Justificativa ausente');
-    result[key].trechos.forEach(t => {
-      if (!t.trecho?.trim()) throw new Error('Trecho vazio');
-      t.trecho = excerpt(t.trecho);
-    });
+    if (hasImages) {
+      result[key].trechos = (result[key].trechos || []).map(t => {
+        if (!t?.trecho?.trim()) return null;
+        const matched = matchImageEvidence(t.trecho, fullText);
+        if (!matched) return null;
+        return { trecho: matched, explicacao: t.explicacao || '' };
+      }).filter(Boolean);
+    } else {
+      result[key].trechos.forEach(t => {
+        if (!t.trecho?.trim()) throw new Error('Trecho vazio');
+        t.trecho = excerpt(t.trecho);
+      });
+    }
   }
+
   if (!result.c5.justificativa?.trim()) throw new Error('Justificativa ausente');
   for (const el of Object.values(result.c5.quadro)) {
-    if (el.encontrado && !el.trecho?.trim()) throw new Error('Elemento sem evidência');
-    el.trecho = excerpt(el.trecho);
+    if (el.encontrado) {
+      if (!el.trecho?.trim()) {
+        if (hasImages) {
+          el.encontrado = false;
+          el.trecho = '';
+        } else {
+          throw new Error('Elemento sem evidência');
+        }
+      } else {
+        if (hasImages) {
+          const matched = matchImageEvidence(el.trecho, fullText);
+          if (matched) {
+            el.trecho = matched;
+          } else {
+            el.encontrado = false;
+            el.trecho = '';
+          }
+        } else {
+          el.trecho = excerpt(el.trecho);
+        }
+      }
+    } else {
+      el.trecho = '';
+    }
   }
-  result.devolutiva.trechosParaRevisar.forEach(t => {
-    if (!t.original?.trim()) throw new Error('Trecho vazio');
-    t.original = excerpt(t.original);
-  });
-  result.notaZero.evidencia = excerpt(result.notaZero.evidencia);
+
+  if (hasImages) {
+    result.devolutiva.trechosParaRevisar = (result.devolutiva.trechosParaRevisar || []).map(t => {
+      if (!t?.original?.trim()) return null;
+      const matched = matchImageEvidence(t.original, fullText);
+      if (!matched) return null;
+      return { original: matched, problema: t.problema || '', orientacao: t.orientacao || '' };
+    }).filter(Boolean);
+  } else {
+    result.devolutiva.trechosParaRevisar.forEach(t => {
+      if (!t.original?.trim()) throw new Error('Trecho vazio');
+      t.original = excerpt(t.original);
+    });
+  }
+
+  if (references && result.notaZero?.evidencia) {
+    result.notaZero.evidencia = excerpt(result.notaZero.evidencia);
+  } else if (result.notaZero?.isZeroRisk) {
+    if (result.notaZero.evidencia?.trim()) {
+      if (hasImages) {
+        const matched = matchImageEvidence(result.notaZero.evidencia, fullText);
+        result.notaZero.evidencia = matched || '';
+      } else {
+        result.notaZero.evidencia = excerpt(result.notaZero.evidencia);
+      }
+    } else {
+      result.notaZero.evidencia = '';
+    }
+  } else if (result.notaZero) {
+    result.notaZero.evidencia = '';
+  }
 
   return result;
 }
