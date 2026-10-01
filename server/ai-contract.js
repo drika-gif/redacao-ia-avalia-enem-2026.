@@ -14,6 +14,17 @@ export const schema = object({
     trechosParaRevisar: { type: 'array', maxItems: 8, items: object({ original: text, problema: text, orientacao: text }) } })
 });
 
+// Google's schema subset does not document string length constraints.
+// Keep those in local validation; do not send unsupported keywords upstream.
+function providerSchema(spec) {
+  const { maxLength, ...supported } = spec;
+  if (supported.properties) supported.properties = Object.fromEntries(
+    Object.entries(supported.properties).map(([key, value]) => [key, providerSchema(value)]));
+  if (supported.items) supported.items = providerSchema(supported.items);
+  return supported;
+}
+export const geminiSchema = providerSchema(schema);
+
 export function validateInput(body) {
   if (!body || typeof body.tema !== 'string' || typeof body.transcricao !== 'string' ||
       !body.tema.trim() || body.tema.length > 1000 || !body.transcricao.trim() || body.transcricao.length > 30000 ||

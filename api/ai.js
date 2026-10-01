@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { schema, instruction, validateInput, validateResult } from '../server/ai-contract.js';
+import { geminiSchema, instruction, validateInput, validateResult } from '../server/ai-contract.js';
 
 export function makeHandler({ env = process.env, fetcher = fetch, clientFactory = createClient } = {}) {
   return async (req, res) => {
@@ -29,7 +29,7 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
         body: JSON.stringify({ systemInstruction: { parts: [{ text: instruction }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
           generationConfig: { temperature: 0.2, maxOutputTokens: 12000,
-            responseMimeType: 'application/json', responseJsonSchema: schema } })
+            responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: geminiSchema } } } })
       });
       if (!response.ok) {
         // Never expose Google's raw error body: it may contain input or credentials.

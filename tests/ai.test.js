@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeHandler } from '../api/ai.js';
-import { schema, validateResult } from '../server/ai-contract.js';
+import { schema, geminiSchema, validateResult } from '../server/ai-contract.js';
 
 const empty = spec => spec.type === 'object' ? Object.fromEntries(Object.entries(spec.properties).map(([k,v]) => [k, empty(v)])) : spec.type === 'array' ? [] : spec.type === 'boolean' ? false : spec.type === 'integer' ? 120 : '';
 const result = () => {
@@ -19,8 +19,9 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       called = true;
       assert.equal(opts.headers['x-goog-api-key'], env.GEMINI_API_KEY);
       const body = JSON.parse(opts.body);
-      assert.equal(body.generationConfig.responseMimeType, 'application/json');
-      assert.deepEqual(body.generationConfig.responseJsonSchema, schema);
+      assert.equal(body.generationConfig.responseFormat.text.mimeType, 'APPLICATION_JSON');
+      assert.deepEqual(body.generationConfig.responseFormat.text.schema, geminiSchema);
+      assert.equal('responseJsonSchema' in body.generationConfig, false);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
       return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(result()) }] } }] }) };
     }, ...overrides });
@@ -52,6 +53,12 @@ test('oversized transcription rejected before authentication/provider', async ()
 test('invalid grades and hallucinated excerpts rejected', () => {
   const badScore = result(); badScore.c1.sugerida=150; assert.throws(() => validateResult(badScore,'texto teste'));
   const invented = result(); invented.c1.trechos[0].trecho='inventado'; assert.throws(() => validateResult(invented,'texto teste'));
+});
+test('provider schema omits unsupported lengths but local validation keeps them', () => {
+  assert.equal(JSON.stringify(geminiSchema).includes('maxLength'), false);
+  assert.deepEqual(geminiSchema.properties.c1.properties.sugerida.enum, [0,40,80,120,160,200]);
+  const tooLong = result(); tooLong.c1.justificativa = 'a'.repeat(2001);
+  assert.throws(() => validateResult(tooLong, 'texto teste'));
 });
 test('provider failure does not return automatic fallback grades', async () => {
   const { res } = await invoke({ fetcher: async () => ({ ok: false, status: 500 }) }); assert.equal(res.code, 502); assert.equal(res.value.analysis, undefined);
