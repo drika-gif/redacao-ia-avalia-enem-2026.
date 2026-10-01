@@ -127,6 +127,15 @@ export const AuthPage: React.FC = () => {
           <p className="text-xs text-slate-500 mt-1 italic">
             "Da fotografia da redação à planilha final."
           </p>
+          <p className="text-xs text-slate-700 mt-3">
+            Projeto pedagógico da Professora Adriana Aguiar.
+            Não é um serviço oficial do Inep ou do ENEM.
+          </p>
+        </div>
+
+        <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 leading-relaxed">
+          Use a conta criada neste aplicativo. A senha do Redação IA deve ser exclusiva:
+          não use a senha do seu e-mail, Google ou outros serviços.
         </div>
 
         {/* Abas de Navegação */}
@@ -178,6 +187,8 @@ export const AuthPage: React.FC = () => {
               </label>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -188,10 +199,12 @@ export const AuthPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                Senha:
+                Senha do Redação IA:
               </label>
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 required
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
@@ -261,10 +274,12 @@ export const AuthPage: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-1">
-                Senha (mínimo 6 caracteres):
+                Crie uma senha exclusiva (mínimo 6 caracteres):
               </label>
               <input
                 type="password"
+                name="new-password"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={senha}
@@ -280,6 +295,8 @@ export const AuthPage: React.FC = () => {
               </label>
               <input
                 type="password"
+                name="confirm-password"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={confSenha}
