@@ -7,6 +7,8 @@ interface TranscriptionViewProps {
   transcricao: string;
   onChangeTranscricao: (texto: string) => void;
   onConfirm: () => void;
+  busy?: boolean;
+  error?: string;
 }
 
 export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
@@ -14,6 +16,8 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
   transcricao,
   onChangeTranscricao,
   onConfirm,
+  busy = false,
+  error = '',
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
@@ -75,13 +79,16 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-slate-600">Ao confirmar, o texto e o tema serão enviados ao Gemini para sugerir notas. Revise a transcrição antes de continuar.</p>
+      {error && <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700">{error}</p>}
+      {busy && <p role="status" className="p-3 rounded-xl bg-blue-50 text-blue-700">Analisando com IA. Aguarde, isso pode levar até um minuto.</p>}
       {/* Botões superiores */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={executarOcrGratuito}
-            disabled={isOcrLoading || imagens.length === 0}
+            disabled={busy || isOcrLoading || imagens.length === 0}
             className="bg-brand-50 hover:bg-brand-100 text-brand-700 font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 border border-brand-200 transition disabled:opacity-50"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -90,6 +97,7 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
 
           <button
             type="button"
+            disabled={busy}
             onClick={inserirTrechoIlegivel}
             className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 transition"
             title="Inserir marcação padrão [trecho ilegível]"
@@ -155,6 +163,7 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
 
           <div className="flex-1 p-3 flex flex-col">
             <textarea
+              disabled={busy}
               value={transcricao}
               onChange={(e) => onChangeTranscricao(e.target.value)}
               placeholder="Digite, cole ou ajuste a transcrição da redação aqui...&#10;&#10;Dica: Divida em parágrafos exatamente como o estudante escreveu na folha de resposta."
@@ -171,11 +180,11 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
             <button
               type="button"
               onClick={onConfirm}
-              disabled={!transcricao.trim()}
+              disabled={busy || isOcrLoading || !transcricao.trim()}
               className="bg-brand-700 hover:bg-brand-800 disabled:opacity-40 text-white font-bold px-5 py-2 rounded-xl text-xs uppercase tracking-wider transition shadow-sm flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirmar Transcrição</span>
+              <span>{busy ? 'Analisando...' : 'Confirmar e analisar com IA'}</span>
             </button>
           </div>
         </div>

@@ -12,7 +12,7 @@ export class DbService {
     const client = getSupabaseClient() || supabase;
 
     // 1. Tenta buscar do Supabase se autenticado
-    if (client && userId) {
+    if (client && userId && !userId.startsWith('demo-')) {
       try {
         const { data, error } = await client
           .from('correcoes')
@@ -63,22 +63,12 @@ export class DbService {
 
     const client = getSupabaseClient() || supabase;
 
-    // 1. Salva no Supabase se houver conexão e usuário logado
-    if (client && userId) {
-      try {
-        const { data, error } = await client
-          .from('correcoes')
-          .upsert([record])
-          .select()
-          .single();
-
-        if (!error && data) {
-          this.atualizarRegistroCacheLocal(data as Correcao, userId);
-          return data as Correcao;
-        }
-      } catch (err) {
-        console.warn('Erro ao salvar no Supabase, salvando localmente:', err);
-      }
+    if (userId && !userId.startsWith('demo-')) {
+      if (!client) throw new Error('Conexão com a nuvem não configurada. A correção não foi salva.');
+      const { data, error } = await client.from('correcoes').upsert([record]).select().single();
+      if (error || !data) throw new Error('Não foi possível salvar na nuvem. Verifique sua conexão e tente novamente.');
+      this.atualizarRegistroCacheLocal(data as Correcao, userId);
+      return data as Correcao;
     }
 
     // 2. Salva localmente
@@ -92,12 +82,10 @@ export class DbService {
   static async delete(id: string, userId: string | null): Promise<boolean> {
     const client = getSupabaseClient() || supabase;
 
-    if (client && userId) {
-      try {
-        await client.from('correcoes').delete().eq('id', id);
-      } catch (err) {
-        console.warn('Erro ao excluir no Supabase:', err);
-      }
+    if (userId && !userId.startsWith('demo-')) {
+      if (!client) throw new Error('Conexão com a nuvem não configurada.');
+      const { error } = await client.from('correcoes').delete().eq('id', id);
+      if (error) throw new Error('Não foi possível excluir na nuvem. Tente novamente.');
     }
 
     // Exclui do cache local
@@ -149,7 +137,7 @@ export class DbService {
       if (!raw) return [];
       const all: Correcao[] = JSON.parse(raw);
       if (!Array.isArray(all)) return [];
-      return all.filter((r) => (userId ? r.user_id === userId : true));
+      return all.filter((r) => (userId ? r.user_id === userId : r.user_id?.startsWith('demo-')));
     } catch {
       return [];
     }

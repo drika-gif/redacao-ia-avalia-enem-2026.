@@ -1,19 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const getEnv = (key: string): string => {
-  try {
-    const meta = import.meta as any;
-    if (meta && meta.env && meta.env[key]) {
-      return String(meta.env[key]);
-    }
-  } catch {}
-  return '';
-};
-
 // Obtém as credenciais das variáveis de ambiente ou do localStorage (para configuração direta no navegador)
 export const getSupabaseCredentials = () => {
-  const envUrl = getEnv('VITE_SUPABASE_URL');
-  const envKey = getEnv('VITE_SUPABASE_ANON_KEY');
+  const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
   const localUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('redacao_supabase_url') || '' : '';
   const localKey = typeof localStorage !== 'undefined' ? localStorage.getItem('redacao_supabase_key') || '' : '';
@@ -39,29 +29,20 @@ if (!credentials.isConfigured) {
   );
 }
 
-// Cria cliente Supabase seguro
-export const supabase: SupabaseClient | null = credentials.isConfigured
-  ? createClient(credentials.url, credentials.key, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : null;
-
-// Recria o cliente dinamicamente se a usuária salvar credenciais em tempo de execução
+let cachedClient: SupabaseClient | null = null;
+let cachedCredentials = '';
 export const getSupabaseClient = (): SupabaseClient | null => {
   const creds = getSupabaseCredentials();
   if (!creds.isConfigured) return null;
-  return createClient(creds.url, creds.key, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
+  const signature = `${creds.url}|${creds.key}`;
+  if (cachedClient && signature === cachedCredentials) return cachedClient;
+  cachedClient = createClient(creds.url, creds.key, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
   });
+  cachedCredentials = signature;
+  return cachedClient;
 };
+export const supabase = getSupabaseClient();
 
 export const SUPABASE_SQL_SCHEMA = `-- ==============================================================================
 -- SCRIPT SQL OFICIAL: TABELA 'correcoes' COM ROW LEVEL SECURITY (RLS)

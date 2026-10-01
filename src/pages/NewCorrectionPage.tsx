@@ -9,7 +9,7 @@ import {
   AnaliseCompetencia, 
   DevolutivaPedagogica 
 } from '../types';
-import { AnalisadorAvaliaEnem2026 } from '../lib/analyzer';
+import { analisarComIA } from '../lib/ai';
 import { DbService } from '../lib/db';
 import { ImageViewer } from '../components/ImageViewer';
 import { TranscriptionView } from '../components/TranscriptionView';
@@ -113,86 +113,47 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
     setEtapa(2);
   };
 
-  // 2. Confirmar Transcrição e Iniciar Análise do Avalia ENEM 2026
-  const handleConfirmarTranscricao = () => {
-    if (!transcricao.trim()) {
-      alert('A transcrição não pode estar em branco.');
-      return;
-    }
+  const [analisando, setAnalisando] = useState(false);
+  const [erroAnalise, setErroAnalise] = useState('');
 
-    // 4. Verificação dos 10 Critérios de Nota Zero
-    const zeroCheck = AnalisadorAvaliaEnem2026.verificarNotaZero(transcricao, tema);
-    if (zeroCheck.isZeroRisk) {
-      setZeroData(zeroCheck);
-      setShowZeroModal(true);
-      return;
-    }
-
-    executarAnalisePedagogica();
-    setEtapa(4);
+  const handleConfirmarTranscricao = async () => {
+    if (analisando || !transcricao.trim()) return;
+    setAnalisando(true);
+    setErroAnalise('');
+    setIsNotaZeroConfirmada(false);
+    setConfirmouRevisao(false);
+    try {
+      const result = await analisarComIA(tema, transcricao);
+      setC1Sugerida(result.c1.sugerida); setC1Final(result.c1.sugerida);
+      setC1Justificativa(result.c1.justificativa); setC1Analise(result.c1);
+      setC2Sugerida(result.c2.sugerida); setC2Final(result.c2.sugerida);
+      setC2Justificativa(result.c2.justificativa); setC2Analise(result.c2);
+      setC3Sugerida(result.c3.sugerida); setC3Final(result.c3.sugerida);
+      setC3Justificativa(result.c3.justificativa); setC3Analise(result.c3);
+      setC4Sugerida(result.c4.sugerida); setC4Final(result.c4.sugerida);
+      setC4Justificativa(result.c4.justificativa); setC4Analise(result.c4);
+      setC5Sugerida(result.c5.sugerida); setC5Final(result.c5.sugerida);
+      setC5Justificativa(result.c5.justificativa); setC5Quadro(result.c5.quadro);
+      setDevolutiva(result.devolutiva);
+      setZeroData(result.notaZero);
+      if (result.notaZero.isZeroRisk) setShowZeroModal(true);
+      else setEtapa(4);
+    } catch (err) {
+      setErroAnalise(err instanceof Error ? err.message : 'Não foi possível analisar. Tente novamente.');
+    } finally { setAnalisando(false); }
   };
 
   const handleConfirmarZero = () => {
     setShowZeroModal(false);
     setIsNotaZeroConfirmada(true);
-
-    setC1Final(0);
-    setC2Final(0);
-    setC3Final(0);
-    setC4Final(0);
-    setC5Final(0);
-
-    const dev = AnalisadorAvaliaEnem2026.gerarDevolutiva(transcricao, tema);
-    setDevolutiva(dev);
+    setC1Final(0); setC2Final(0); setC3Final(0); setC4Final(0); setC5Final(0);
     setEtapa(4);
   };
 
   const handleContinuarAposAlertaZero = () => {
     setShowZeroModal(false);
     setIsNotaZeroConfirmada(false);
-    executarAnalisePedagogica();
     setEtapa(4);
-  };
-
-  const executarAnalisePedagogica = () => {
-    // Competência I
-    const a1 = AnalisadorAvaliaEnem2026.analisarC1(transcricao);
-    setC1Sugerida(a1.sugerida);
-    setC1Final(a1.sugerida);
-    setC1Justificativa(a1.justificativa);
-    setC1Analise(a1);
-
-    // Competência II
-    const a2 = AnalisadorAvaliaEnem2026.analisarC2(transcricao, tema);
-    setC2Sugerida(a2.sugerida);
-    setC2Final(a2.sugerida);
-    setC2Justificativa(a2.justificativa);
-    setC2Analise(a2);
-
-    // Competência III
-    const a3 = AnalisadorAvaliaEnem2026.analisarC3(transcricao);
-    setC3Sugerida(a3.sugerida);
-    setC3Final(a3.sugerida);
-    setC3Justificativa(a3.justificativa);
-    setC3Analise(a3);
-
-    // Competência IV
-    const a4 = AnalisadorAvaliaEnem2026.analisarC4(transcricao);
-    setC4Sugerida(a4.sugerida);
-    setC4Final(a4.sugerida);
-    setC4Justificativa(a4.justificativa);
-    setC4Analise(a4);
-
-    // Competência V (Quadro dos 5 Elementos e Regra de Direitos Humanos)
-    const a5 = AnalisadorAvaliaEnem2026.analisarC5(transcricao);
-    setC5Sugerida(a5.sugerida);
-    setC5Final(a5.sugerida);
-    setC5Justificativa(a5.justificativa);
-    setC5Quadro(a5.quadro);
-
-    // Devolutiva Pedagógica
-    const dev = AnalisadorAvaliaEnem2026.gerarDevolutiva(transcricao, tema);
-    setDevolutiva(dev);
   };
 
   // Salvar no Banco
@@ -490,11 +451,14 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                 transcricao={transcricao}
                 onChangeTranscricao={setTranscricao}
                 onConfirm={handleConfirmarTranscricao}
+                busy={analisando}
+                error={erroAnalise}
               />
 
               <div className="flex justify-between items-center pt-2">
                 <button
                   type="button"
+                  disabled={analisando}
                   onClick={() => setEtapa(2)}
                   className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-1"
                 >
@@ -516,7 +480,7 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                     Avaliação das 5 Competências • {estudante}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Revise as notas sugeridas pela inteligência pedagógica e confirme a pontuação oficial.
+                    Revise as notas sugeridas pela IA Gemini e confirme sua avaliação. A sugestão não é uma nota oficial do Inep.
                   </p>
                 </div>
                 <div className="bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-800">
