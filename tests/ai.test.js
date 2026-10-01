@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeHandler } from '../api/ai.js';
-import { schema, geminiSchema, validateResult } from '../server/ai-contract.js';
+import { schema, geminiSchema, evidenceSchema, sourceReferences, validateResult } from '../server/ai-contract.js';
 
 const empty = spec => spec.type === 'object' ? Object.fromEntries(Object.entries(spec.properties).map(([k,v]) => [k, empty(v)])) : spec.type === 'array' ? [] : spec.type === 'boolean' ? false : spec.type === 'integer' ? 120 : '';
 const result = () => {
@@ -20,11 +20,14 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       assert.equal(opts.headers['x-goog-api-key'], env.GEMINI_API_KEY);
       const body = JSON.parse(opts.body);
       assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000 });
-      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(geminiSchema)), true);
+      const input = JSON.parse(body.contents[0].parts[0].text);
+      assert.deepEqual(input.trechosFonte, { E001: 'texto teste' });
+      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(evidenceSchema(input.trechosFonte))), true);
       for (const key of ['temperature', 'topP', 'topK', 'candidateCount'])
         assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini 3.8`);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
-      return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(result()) }] } }] }) };
+      const value = result(); value.c1.trechos[0].trecho = 'E001';
+      return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(value) }] } }] }) };
     }, ...overrides });
   const res = { code: 0, value: null, headers: {}, setHeader(k,v) { this.headers[k]=v; }, status(n) { this.code=n; return this; }, json(v) { this.value=v; return this; } };
   await handler({ method: 'POST', headers: { authorization: 'Bearer valid-token' }, body: { tema: 'Tema', transcricao: 'texto teste' }, ...reqOverride }, res);
@@ -50,6 +53,7 @@ test('safe diagnostics distinguish timeout, incomplete JSON, and invalid evidenc
 });
 test('authenticated successful analysis contains no API secret', async () => {
   const { res, called } = await invoke(); assert.equal(res.code, 200); assert.equal(called, true);
+  assert.equal(res.value.analysis.c1.trechos[0].trecho, 'texto teste');
   assert.equal(JSON.stringify(res.value).includes(env.GEMINI_API_KEY), false);
 });
 test('unauthenticated request never calls provider', async () => {
@@ -123,12 +127,46 @@ test('region and billing failures are not confused with malformed request', asyn
 test('minimal call accepts fenced JSON but still rejects invented evidence', async () => {
   for (const invented of [false, true]) {
     const value = result();
-    if (invented) value.c1.trechos[0].trecho = 'frase que não existe';
+    value.c1.trechos[0].trecho = invented ? 'frase que não existe' : 'E001';
     const { res } = await invoke({ fetcher: async () => ({ ok: true, json: async () => ({
       candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '```json\n' + JSON.stringify(value) + '\n```' }] } }]
     }) }) });
     assert.equal(res.code, invented ? 502 : 200);
     if (invented) assert.equal(res.value.analysis, undefined);
+  }
+});
+test('source IDs expand into exact evidence in every evidence field', () => {
+  const source = 'texto\n teste. A escola deve agir!';
+  const refs = sourceReferences(source);
+  assert.deepEqual(refs, { E001: 'texto\n teste.', E002: 'A escola deve agir!' });
+  const value = result();
+  for (const key of ['c1','c2','c3','c4']) value[key].trechos = [{ trecho: 'E001', explicacao: 'Observação.' }];
+  for (const el of Object.values(value.c5.quadro)) { el.encontrado = true; el.trecho = 'E002'; }
+  value.notaZero.evidencia = 'E001';
+  value.devolutiva.trechosParaRevisar = [{ original: 'E001', problema: 'Problema.', orientacao: 'Orientação.' }];
+  const analysis = validateResult(value, source, refs);
+  for (const key of ['c1','c2','c3','c4']) assert.equal(analysis[key].trechos[0].trecho, refs.E001);
+  for (const el of Object.values(analysis.c5.quadro)) assert.equal(el.trecho, refs.E002);
+  assert.equal(analysis.notaZero.evidencia, refs.E001);
+  assert.equal(analysis.devolutiva.trechosParaRevisar[0].original, refs.E001);
+});
+test('unknown, copied, combined, and inherited source IDs fail closed', () => {
+  for (const id of ['E999', 'texto teste', 'E001 E002', 'toString', '__proto__']) {
+    const value = result(); value.c1.trechos[0].trecho = id;
+    assert.throws(() => validateResult(value, 'texto teste', sourceReferences('texto teste')), /Referência de evidência inválida/);
+  }
+  const value = result(); value.c1.trechos[0].trecho = 'E001';
+  assert.throws(() => validateResult(value, 'texto teste', { E001: 'inventado' }), /Referência de evidência inválida/);
+});
+test('long source fragments remain literal and fit the local schema', () => {
+  for (const source of ['a'.repeat(30000), ('palavra\n outra ').repeat(1800), 'a.'.repeat(15000)]) {
+    const refs = sourceReferences(source);
+    assert.ok(Object.keys(refs).length > 1);
+    assert.ok(Object.keys(refs).length <= 220);
+    for (const fragment of Object.values(refs)) { assert.ok(fragment.length <= 1800); assert.ok(source.includes(fragment)); }
+    const spec = evidenceSchema(refs);
+    assert.deepEqual(spec.properties.c1.properties.trechos.items.properties.trecho.enum, ['', ...Object.keys(refs)]);
+    assert.equal(JSON.stringify(spec).includes('maxLength'), false);
   }
 });
 test('invalid key without structured details is identified and never retried', async () => {

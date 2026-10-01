@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { geminiSchema, instruction, validateInput, validateResult } from '../server/ai-contract.js';
+import { evidenceSchema, sourceReferences, instruction, validateInput, validateResult } from '../server/ai-contract.js';
 
 export function makeHandler({ env = process.env, fetcher = fetch, clientFactory = createClient, logger = console } = {}) {
   return async (req, res) => {
@@ -27,11 +27,12 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       if (limit.error) return res.status(503).json({ error: 'O serviço de IA está temporariamente indisponível.' });
       if (limit.data !== true) return res.status(429).json({ error: 'Você atingiu o limite de 20 análises por hora. Tente mais tarde.' });
       stage = 'provider';
+      const references = sourceReferences(input.transcricao);
       const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
         method: 'POST', signal: AbortSignal.timeout(55000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown. Respeite este esquema: ${JSON.stringify(geminiSchema)}\nLimite cada texto a 2000 caracteres.` }] },
-          contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown. Respeite este esquema: ${JSON.stringify(evidenceSchema(references))}\nLimite cada texto a 2000 caracteres.` }] },
+          contents: [{ role: 'user', parts: [{ text: JSON.stringify({ ...input, trechosFonte: references }) }] }],
           generationConfig: { maxOutputTokens: 12000 } })
       });
       if (!response.ok) {
@@ -81,13 +82,13 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       stage = 'json';
       const parsed = JSON.parse(json);
       stage = 'validation';
-      const analysis = validateResult(parsed, input.transcricao);
+      const analysis = validateResult(parsed, input.transcricao, references);
       return res.status(200).json({ analysis, provider: 'Gemini', model: env.GEMINI_MODEL });
     } catch (error) {
       const timeout = error?.name === 'TimeoutError' || error?.name === 'AbortError';
       const code = timeout ? 'IA_TIMEOUT' : stage === 'completion' ? 'IA_INCOMPLETE' : stage === 'json' ? 'IA_JSON_INVALID' : stage === 'validation' ? 'IA_VALIDATION_FAILED' : 'IA_CALL_FAILED';
       // Only allowlisted metadata: never log provider text, essay, tokens, or credentials.
-      const validationReasons = ['Objeto inválido', 'Campo inesperado', 'Lista inválida', 'Nota inválida', 'Campo inválido', 'Trecho não encontrado na redação', 'Justificativa ausente', 'Trecho vazio', 'Elemento sem evidência'];
+      const validationReasons = ['Objeto inválido', 'Campo inesperado', 'Lista inválida', 'Nota inválida', 'Campo inválido', 'Trecho não encontrado na redação', 'Referência de evidência inválida', 'Justificativa ausente', 'Trecho vazio', 'Elemento sem evidência'];
       logger.warn('[IA] Análise não concluída', { code, stage, finishReason, elapsedMs: Date.now() - started,
         ...(stage === 'validation' && validationReasons.includes(error?.message) ? { reason: error.message } : {}) });
       return res.status(502).json({ error: `A IA não concluiu uma análise válida (${code}). Sua transcrição foi preservada; tente novamente.` });

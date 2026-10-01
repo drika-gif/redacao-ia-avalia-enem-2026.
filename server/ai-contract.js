@@ -25,6 +25,39 @@ function providerSchema(spec) {
 }
 export const geminiSchema = providerSchema(schema);
 
+// The model selects source IDs instead of retyping evidence. The server alone
+// expands those IDs into literal source text; invalid IDs fail closed.
+export function sourceReferences(transcricao) {
+  const references = {};
+  let sentences = transcricao.match(/[^.!?]+[.!?]+|[^.!?]+$/gu) || [transcricao];
+  // Bound prompt growth even for an input containing thousands of tiny sentences.
+  if (sentences.length > 200) sentences = transcricao.match(/[\s\S]{1,1800}/gu);
+  for (let sentence of sentences) {
+    sentence = sentence.trim();
+    while (sentence) {
+      let end = Math.min(sentence.length, 1800);
+      if (end < sentence.length) {
+        const space = sentence.lastIndexOf(' ', end);
+        if (space > 0) end = space;
+      }
+      const fragment = sentence.slice(0, end).trim();
+      if (fragment) references[`E${String(Object.keys(references).length + 1).padStart(3, '0')}`] = fragment;
+      sentence = sentence.slice(end).trim();
+    }
+  }
+  return references;
+}
+
+export function evidenceSchema(references) {
+  const spec = structuredClone(geminiSchema);
+  const ref = { type: 'string', enum: ['', ...Object.keys(references)] };
+  for (const key of ['c1', 'c2', 'c3', 'c4']) spec.properties[key].properties.trechos.items.properties.trecho = ref;
+  for (const el of Object.values(spec.properties.c5.properties.quadro.properties)) el.properties.trecho = ref;
+  spec.properties.notaZero.properties.evidencia = ref;
+  spec.properties.devolutiva.properties.trechosParaRevisar.items.properties.original = ref;
+  return spec;
+}
+
 export function validateInput(body) {
   if (!body || typeof body.tema !== 'string' || typeof body.transcricao !== 'string' ||
       !body.tema.trim() || body.tema.length > 1000 || !body.transcricao.trim() || body.transcricao.length > 30000 ||
@@ -46,9 +79,14 @@ function validate(value, spec) {
   } else if (typeof value !== spec.type || (spec.maxLength && value.length > spec.maxLength)) throw new Error('Campo inválido');
 }
 
-export function validateResult(result, transcricao) {
+export function validateResult(result, transcricao, references) {
   validate(result, schema);
   const excerpt = s => {
+    if (references && s) {
+      if (!Object.hasOwn(references, s) || !transcricao.includes(references[s]))
+        throw new Error('Referência de evidência inválida');
+      return references[s];
+    }
     if (!s || transcricao.includes(s)) return s;
     // PDF/OCR line breaks may differ from the model's quotation. Only whitespace
     // may vary; restore the exact source excerpt before returning the analysis.
@@ -83,4 +121,5 @@ C5: proposta de intervenção articulada ao problema, com ação, agente, meio, 
 Não calcule notas somente por contagem de palavras, parágrafos ou elementos. Avalie qualidade e desenvolvimento. Não declare certeza sobre critérios que dependam da folha original, linhas manuscritas, textos motivadores ou condições especiais que não foram fornecidos.
 Indique risco de anulação apenas quando houver fundamento, como fuga total ao tema ou ausência do tipo dissertativo-argumentativo. Nunca anule automaticamente: a professora decide.
 Trechos e evidências devem ser cópias literais e contínuas do texto, preservando erros. Não invente frases, erros nem referências. Nunca junte trechos separados nem use reticências para omitir palavras. Não coloque a reescrita no campo de evidência: use o campo de reescrita. Para elemento ausente use encontrado=false e trecho vazio. Em dúvida descreva a limitação.
+Na resposta JSON, os campos trecho, original e evidencia devem conter SOMENTE o identificador de um trecho do catálogo trechosFonte, como E001. Escolha o trecho que sustenta sua observação. O servidor colocará o texto original no lugar do identificador. Nunca digite a citação nesses campos, nem crie identificadores. Use string vazia apenas quando não houver evidência, respeitando os elementos encontrados. As explicações e orientações continuam em linguagem natural. Uma frase inteira pode sustentar mais de um elemento da intervenção.
 Produza feedback específico com pontos fortes, melhorias, erros categorizados e orientações para reescrita. Não reescreva a redação inteira. A pontuação é uma sugestão de apoio, não uma nota oficial do Inep. Responda conforme o esquema JSON.`;
