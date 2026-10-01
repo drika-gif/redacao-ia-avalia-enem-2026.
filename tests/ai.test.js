@@ -190,3 +190,91 @@ test('invalid key without structured details is identified and never retried', a
   assert.equal(calls, 1);
   assert.match(res.value.error, /chave Gemini foi recusada/);
 });
+
+test('direct photo analysis sends inlineData to Gemini and returns transcription', async () => {
+  let capturedBody = null;
+  let calledPhoto = false;
+  const samplePhotoResult = result();
+  samplePhotoResult.transcricao = 'Texto manuscrito lido diretamente da foto.';
+  samplePhotoResult.c1.trechos = [{ trecho: 'Texto manuscrito', explicacao: 'Exemplo.' }];
+
+  const { res } = await invoke({
+    fetcher: async (_url, opts) => {
+      calledPhoto = true;
+      capturedBody = JSON.parse(opts.body);
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{
+            finishReason: 'STOP',
+            content: { parts: [{ text: JSON.stringify(samplePhotoResult) }] }
+          }]
+        })
+      };
+    }
+  }, {
+    body: {
+      tema: 'Desafios da Educação',
+      imagens: [{ dataUrl: 'data:image/jpeg;base64,VEVTVEVfRk9UTw==' }]
+    }
+  });
+
+  assert.equal(calledPhoto, true);
+  assert.equal(res.code, 200);
+  assert.equal(res.value.analysis.transcricao, 'Texto manuscrito lido diretamente da foto.');
+  assert.equal(capturedBody.contents[0].parts[0].inlineData.mimeType, 'image/jpeg');
+  assert.equal(capturedBody.contents[0].parts[0].inlineData.data, 'VEVTVEVfRk9UTw==');
+  assert.equal(capturedBody.contents[0].parts[1].text.includes('Desafios da Educação'), true);
+  assert.equal(capturedBody.generationConfig.responseMimeType, 'application/json');
+});
+
+test('blurry photo flags precisaNovaFoto without 502 error and asks for another image', async () => {
+  const blurryResult = {
+    precisaNovaFoto: true,
+    motivoNovaFoto: 'A imagem está excessivamente borrada e cortada nas margens.',
+    limitacoesLeitura: 'Foto ilegível',
+    transcricao: ''
+  };
+
+  const { res } = await invoke({
+    fetcher: async () => ({
+      ok: true,
+      json: async () => ({
+        candidates: [{
+          finishReason: 'STOP',
+          content: { parts: [{ text: JSON.stringify(blurryResult) }] }
+        }]
+      })
+    })
+  }, {
+    body: {
+      tema: 'Tema Teste',
+      imagens: [{ dataUrl: 'data:image/jpeg;base64,Ymx1cnJ5' }]
+    }
+  });
+
+  assert.equal(res.code, 200);
+  assert.equal(res.value.analysis.precisaNovaFoto, true);
+  assert.match(res.value.analysis.motivoNovaFoto, /excessivamente borrada/);
+  assert.equal(res.value.analysis.c1.sugerida, 0);
+});
+
+test('unsupported image format and excessive images rejected before calling Gemini', async () => {
+  const { res: resFormat, called: calledFormat } = await invoke({}, {
+    body: {
+      tema: 'Tema',
+      imagens: [{ dataUrl: 'data:image/bmp;base64,Ym1w' }]
+    }
+  });
+  assert.equal(resFormat.code, 400);
+  assert.equal(calledFormat, false);
+
+  const { res: resCount, called: calledCount } = await invoke({}, {
+    body: {
+      tema: 'Tema',
+      imagens: Array(5).fill({ dataUrl: 'data:image/jpeg;base64,Zm90bw==' })
+    }
+  });
+  assert.equal(resCount.code, 400);
+  assert.equal(calledCount, false);
+});

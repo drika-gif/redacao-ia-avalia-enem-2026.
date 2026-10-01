@@ -41,7 +41,7 @@ interface NewCorrectionPageProps {
 export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, initialData }) => {
   const { user } = useAuth();
 
-  // Etapa atual: 1: Dados -> 2: Fotos -> 3: Transcrição -> 4: Competências -> 5: Devolutiva e Salvar
+  // Etapa atual: 1: Dados -> 2: Fotos -> 3: Transcrição (opcional) -> 4: Competências -> 5: Devolutiva e Salvar
   const [etapa, setEtapa] = useState<number>(1);
 
   // Dados do Cabeçalho
@@ -54,6 +54,10 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   // Mídias e Transcrição
   const [imagens, setImagens] = useState<ImagemFolha[]>([]);
   const [transcricao, setTranscricao] = useState('');
+  const [limitacoesLeitura, setLimitacoesLeitura] = useState('');
+  const [motivoNovaFoto, setMotivoNovaFoto] = useState('');
+  const [showNovaFotoAviso, setShowNovaFotoAviso] = useState(false);
+  const [mostrarTranscricaoNaRevisao, setMostrarTranscricaoNaRevisao] = useState(false);
 
   // Verificação de Nota Zero
   const [zeroData, setZeroData] = useState<PossivelNotaZero | null>(null);
@@ -93,6 +97,9 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   const [salvando, setSalvando] = useState(false);
   const [salvoComSucesso, setSalvoComSucesso] = useState(false);
 
+  const [analisando, setAnalisando] = useState(false);
+  const [erroAnalise, setErroAnalise] = useState('');
+
   // 1. Avançar da etapa 1 (Dados) para etapa 2 (Fotos)
   const handleAvancarDados = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,17 +120,90 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
     setEtapa(2);
   };
 
-  const [analisando, setAnalisando] = useState(false);
-  const [erroAnalise, setErroAnalise] = useState('');
+  // 2. Análise DIRETA PELA FOTO (sem exigir transcrição digitada prévia)
+  const handleAnalisarDiretoPelaFoto = async () => {
+    if (analisando || imagens.length === 0) return;
+    setAnalisando(true);
+    setErroAnalise('');
+    setShowNovaFotoAviso(false);
+    setMotivoNovaFoto('');
+    setIsNotaZeroConfirmada(false);
+    setConfirmouRevisao(false);
 
+    try {
+      const result = await analisarComIA({ tema, imagens });
+
+      // Se a foto não permitir avaliação confiável por falta de nitidez
+      if (result.precisaNovaFoto) {
+        setMotivoNovaFoto(result.motivoNovaFoto || 'A foto da folha está ilegível ou borrada.');
+        setShowNovaFotoAviso(true);
+        setLimitacoesLeitura(result.limitacoesLeitura || result.motivoNovaFoto || '');
+        return;
+      }
+
+      // Preenche transcrição gerada pelo Gemini a partir da foto
+      if (result.transcricao) {
+        setTranscricao(result.transcricao);
+      }
+      setLimitacoesLeitura(result.limitacoesLeitura || '');
+
+      // Preenche as 5 competências
+      setC1Sugerida(result.c1.sugerida); setC1Final(result.c1.sugerida);
+      setC1Justificativa(result.c1.justificativa); setC1Analise(result.c1);
+
+      setC2Sugerida(result.c2.sugerida); setC2Final(result.c2.sugerida);
+      setC2Justificativa(result.c2.justificativa); setC2Analise(result.c2);
+
+      setC3Sugerida(result.c3.sugerida); setC3Final(result.c3.sugerida);
+      setC3Justificativa(result.c3.justificativa); setC3Analise(result.c3);
+
+      setC4Sugerida(result.c4.sugerida); setC4Final(result.c4.sugerida);
+      setC4Justificativa(result.c4.justificativa); setC4Analise(result.c4);
+
+      setC5Sugerida(result.c5.sugerida); setC5Final(result.c5.sugerida);
+      setC5Justificativa(result.c5.justificativa); setC5Quadro(result.c5.quadro);
+
+      setDevolutiva(result.devolutiva);
+      setZeroData(result.notaZero);
+
+      if (result.notaZero?.isZeroRisk) {
+        setShowZeroModal(true);
+      } else {
+        setEtapa(4); // Avança diretamente para a revisão das notas pela professora!
+      }
+    } catch (err) {
+      setErroAnalise(err instanceof Error ? err.message : 'Não foi possível analisar a foto da redação. Tente novamente.');
+    } finally {
+      setAnalisando(false);
+    }
+  };
+
+  // 3. Análise a partir da transcrição (fluxo manual opcional)
   const handleConfirmarTranscricao = async () => {
     if (analisando || !transcricao.trim()) return;
     setAnalisando(true);
     setErroAnalise('');
+    setShowNovaFotoAviso(false);
     setIsNotaZeroConfirmada(false);
     setConfirmouRevisao(false);
     try {
-      const result = await analisarComIA(tema, transcricao);
+      const result = await analisarComIA({ 
+        tema, 
+        transcricao, 
+        imagens: imagens.length > 0 ? imagens : undefined 
+      });
+
+      if (result.precisaNovaFoto) {
+        setMotivoNovaFoto(result.motivoNovaFoto || 'A foto da folha está ilegível ou borrada.');
+        setShowNovaFotoAviso(true);
+        return;
+      }
+
+      if (result.transcricao && !transcricao.trim()) {
+        setTranscricao(result.transcricao);
+      }
+      setLimitacoesLeitura(result.limitacoesLeitura || '');
+
       setC1Sugerida(result.c1.sugerida); setC1Final(result.c1.sugerida);
       setC1Justificativa(result.c1.justificativa); setC1Analise(result.c1);
       setC2Sugerida(result.c2.sugerida); setC2Final(result.c2.sugerida);
@@ -134,13 +214,16 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
       setC4Justificativa(result.c4.justificativa); setC4Analise(result.c4);
       setC5Sugerida(result.c5.sugerida); setC5Final(result.c5.sugerida);
       setC5Justificativa(result.c5.justificativa); setC5Quadro(result.c5.quadro);
+
       setDevolutiva(result.devolutiva);
       setZeroData(result.notaZero);
-      if (result.notaZero.isZeroRisk) setShowZeroModal(true);
+      if (result.notaZero?.isZeroRisk) setShowZeroModal(true);
       else setEtapa(4);
     } catch (err) {
       setErroAnalise(err instanceof Error ? err.message : 'Não foi possível analisar. Tente novamente.');
-    } finally { setAnalisando(false); }
+    } finally { 
+      setAnalisando(false); 
+    }
   };
 
   const handleConfirmarZero = () => {
@@ -170,7 +253,7 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
         turma: turma.trim(),
         nome_estudante: estudante.trim(),
         tema: tema.trim(),
-        transcricao,
+        transcricao: transcricao || '[Redação avaliada diretamente pela foto]',
         c1_sugerida: c1Sugerida,
         c1_final: c1Final,
         c1_justificativa: c1Justificativa,
@@ -203,10 +286,12 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
 
   // Corrigir Próxima Redação
   const handleCorrigirProxima = () => {
-    // Limpa estudante, imagens, transcrição, notas, justificativas
     setEstudante('');
     setImagens([]);
     setTranscricao('');
+    setLimitacoesLeitura('');
+    setMotivoNovaFoto('');
+    setShowNovaFotoAviso(false);
     setZeroData(null);
     setIsNotaZeroConfirmada(false);
     setDevolutiva(undefined);
@@ -214,7 +299,6 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
     setConfirmouRevisao(false);
     setSalvoComSucesso(false);
 
-    // Se NÃO manter dados, limpa também iema, turma, tema
     if (!manterDados) {
       setIemaPleno('');
       setTurma('');
@@ -240,18 +324,18 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
             <span>Foto da Redação</span>
           </div>
           <span>➔</span>
-          <div className={`flex items-center gap-1.5 ${etapa >= 3 ? 'text-brand-700 font-extrabold' : ''}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa >= 3 ? 'bg-brand-700 text-white' : 'bg-slate-200'}`}>3</span>
-            <span>Transcrição</span>
+          <div className={`flex items-center gap-1.5 ${etapa === 3 ? 'text-amber-700 font-extrabold' : 'text-slate-400'}`}>
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa === 3 ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-400'}`}>*</span>
+            <span className="text-[11px]">Transcrição (Opcional)</span>
           </div>
           <span>➔</span>
           <div className={`flex items-center gap-1.5 ${etapa >= 4 ? 'text-brand-700 font-extrabold' : ''}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa >= 4 ? 'bg-brand-700 text-white' : 'bg-slate-200'}`}>4</span>
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa >= 4 ? 'bg-brand-700 text-white' : 'bg-slate-200'}`}>3</span>
             <span>Competências</span>
           </div>
           <span>➔</span>
           <div className={`flex items-center gap-1.5 ${etapa >= 5 ? 'text-brand-700 font-extrabold' : ''}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa >= 5 ? 'bg-brand-700 text-white' : 'bg-slate-200'}`}>5</span>
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${etapa >= 5 ? 'bg-brand-700 text-white' : 'bg-slate-200'}`}>4</span>
             <span>Devolutiva & Salvar</span>
           </div>
         </div>
@@ -382,24 +466,74 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
           )}
 
           {/* ==========================================
-              ETAPA 2: FOTO DA REDAÇÃO
+              ETAPA 2: FOTO DA REDAÇÃO (ANÁLISE DIRETA)
               ========================================== */}
           {etapa === 2 && (
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-              <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+              <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">
                     Foto da Redação • {estudante} ({turma})
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Tire uma foto nítida com o celular ou anexe os arquivos da folha manuscrita.
+                    Tire uma foto com o celular ou anexe o arquivo da folha de redação. A IA analisará diretamente a partir da imagem!
                   </p>
                 </div>
               </div>
 
+              {/* Alerta de Foto Ilegível / Baixa Nitidez */}
+              {showNovaFotoAviso && (
+                <div role="alert" className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 text-amber-950 space-y-2 animate-fadeIn">
+                  <div className="flex items-center gap-2 font-black text-sm text-amber-900">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <span>Atenção: A foto enviada não permitiu uma avaliação confiável</span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    {motivoNovaFoto || 'A imagem está excessivamente borrada, cortada ou escura para permitir a leitura justa dos parágrafos.'}
+                  </p>
+                  <p className="text-[11px] font-semibold text-amber-900">
+                    Nenhuma nota foi penalizada. Por favor, tire outra foto mais nítida, com boa iluminação e enquadrando a folha inteira antes de sugerir notas.
+                  </p>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowNovaFotoAviso(false)}
+                      className="bg-amber-700 hover:bg-amber-800 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm"
+                    >
+                      Entendido, vou capturar outra foto
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Mensagem de Erro Geral */}
+              {erroAnalise && (
+                <div role="alert" className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <span>{erroAnalise}</span>
+                </div>
+              )}
+
+              {/* Mensagem de Carregamento da IA */}
+              {analisando && (
+                <div role="status" className="p-4 sm:p-5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-2 animate-pulse">
+                  <div className="flex items-center gap-2 font-bold text-sm text-blue-950">
+                    <Sparkles className="w-5 h-5 text-blue-600 animate-spin" />
+                    <span>Lendo caligrafia e analisando redação diretamente pela foto...</span>
+                  </div>
+                  <p className="text-blue-800">
+                    O Gemini está transcrevendo o manuscrito e avaliando as 5 competências do ENEM 2026. Isso pode levar alguns segundos.
+                  </p>
+                </div>
+              )}
+
               <ImageViewer
                 imagens={imagens}
-                onAddImages={(novas) => setImagens([...imagens, ...novas])}
+                onAddImages={(novas) => {
+                  setImagens([...imagens, ...novas]);
+                  setShowNovaFotoAviso(false);
+                  setErroAnalise('');
+                }}
                 onUpdateImage={(idx, att) => {
                   const copy = [...imagens];
                   copy[idx] = att;
@@ -410,39 +544,54 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                 }}
               />
 
-              <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <button
                   type="button"
+                  disabled={analisando}
                   onClick={() => setEtapa(1)}
-                  className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                  className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-1 self-start sm:self-auto"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Voltar</span>
+                  <span>Voltar aos Dados</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setEtapa(3)}
-                  className="bg-brand-700 hover:bg-brand-800 text-white font-extrabold px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition shadow-md flex items-center gap-2"
-                >
-                  <span>AVANÇAR PARA TRANSCRIÇÃO</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  {/* Opção para quem preferir transcrição manual */}
+                  <button
+                    type="button"
+                    disabled={analisando}
+                    onClick={() => setEtapa(3)}
+                    className="text-xs font-bold text-slate-500 hover:text-brand-700 underline py-2 transition"
+                  >
+                    Transcrição manual / OCR local (opcional)
+                  </button>
+
+                  {/* Botão Principal de Análise Direta pela Foto */}
+                  <button
+                    type="button"
+                    onClick={handleAnalisarDiretoPelaFoto}
+                    disabled={analisando || imagens.length === 0}
+                    className="bg-brand-700 hover:bg-brand-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold px-6 py-3.5 rounded-xl text-xs uppercase tracking-wider transition shadow-md flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>{analisando ? 'Analisando Foto com IA...' : 'ANALISAR REDAÇÃO PELA FOTO COM IA'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {/* ==========================================
-              ETAPA 3: TRANSCRIÇÃO DA REDAÇÃO
+              ETAPA 3: TRANSCRIÇÃO (OPCIONAL / MANUAL)
               ========================================== */}
           {etapa === 3 && (
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
               <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-lg font-black text-slate-900">
-                  Transcrição da Redação • {estudante} ({turma})
+                  Transcrição da Redação (Opcional) • {estudante} ({turma})
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Confira, digite ou ajuste a transcrição. Trechos ilegíveis devem ser marcados como [trecho ilegível].
+                  Caso deseje, você pode digitar, colar ou ajustar o texto antes de enviar para a análise da IA.
                 </p>
               </div>
 
@@ -480,13 +629,57 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                     Avaliação das 5 Competências • {estudante}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Revise as notas sugeridas pela IA Gemini e confirme sua avaliação. A sugestão não é uma nota oficial do Inep.
+                    Revise as notas sugeridas pela IA Gemini e confirme sua avaliação. A professora tem total autonomia para ajustar as notas.
                   </p>
                 </div>
                 <div className="bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-xl text-xs font-bold text-brand-800">
                   Turma: {turma} • {iemaPleno}
                 </div>
               </div>
+
+              {/* Observações de Limitações de Leitura / Nitidez */}
+              {limitacoesLeitura && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-900 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold">Observações de leitura da imagem:</p>
+                    <p className="mt-0.5 text-amber-800">{limitacoesLeitura}</p>
+                    <p className="mt-1 text-[11px] text-amber-700 italic">
+                      A aluna não foi penalizada nas competências por eventuais limitações de nitidez ou trechos ilegíveis da foto.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Visualizador / Editor expansível da Transcrição lida pela IA */}
+              {transcricao && (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setMostrarTranscricaoNaRevisao(!mostrarTranscricaoNaRevisao)}
+                    className="w-full flex items-center justify-between text-left font-bold text-slate-800 hover:text-brand-700 transition"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-brand-600" />
+                      <span>Texto Transcrito da Redação pela IA {mostrarTranscricaoNaRevisao ? '(Ocultar)' : '(Visualizar / Ajustar)'}</span>
+                    </span>
+                    <span className="text-slate-400 font-normal">{mostrarTranscricaoNaRevisao ? '▲' : '▼'}</span>
+                  </button>
+                  {mostrarTranscricaoNaRevisao && (
+                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                      <p className="text-[11px] text-slate-500">
+                        Você pode conferir ou ajustar o texto transcrito pela IA. Trechos ilegíveis foram sinalizados com <code>[trecho ilegível]</code>.
+                      </p>
+                      <textarea
+                        rows={6}
+                        value={transcricao}
+                        onChange={(e) => setTranscricao(e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-brand-600 focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <CompetenceScorer
                 c1Sugerida={c1Sugerida}
@@ -523,11 +716,11 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
               <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setEtapa(3)}
+                  onClick={() => setEtapa(2)}
                   className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-1"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Voltar à Transcrição</span>
+                  <span>Voltar às Fotos</span>
                 </button>
 
                 <button
