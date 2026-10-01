@@ -48,18 +48,27 @@ function validate(value, spec) {
 
 export function validateResult(result, transcricao) {
   validate(result, schema);
-  const excerpt = s => { if (s && !transcricao.includes(s)) throw new Error('Trecho não encontrado na redação'); };
+  const excerpt = s => {
+    if (!s || transcricao.includes(s)) return s;
+    // PDF/OCR line breaks may differ from the model's quotation. Only whitespace
+    // may vary; restore the exact source excerpt before returning the analysis.
+    const words = s.trim().split(/\s+/u);
+    const pattern = words.map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+    const match = pattern && transcricao.match(new RegExp(pattern, 'u'));
+    if (!match) throw new Error('Trecho não encontrado na redação');
+    return match[0];
+  };
   for (const key of ['c1', 'c2', 'c3', 'c4']) {
     if (!result[key].justificativa.trim()) throw new Error('Justificativa ausente');
-    result[key].trechos.forEach(t => { if (!t.trecho.trim()) throw new Error('Trecho vazio'); excerpt(t.trecho); });
+    result[key].trechos.forEach(t => { if (!t.trecho.trim()) throw new Error('Trecho vazio'); t.trecho = excerpt(t.trecho); });
   }
   if (!result.c5.justificativa.trim()) throw new Error('Justificativa ausente');
   for (const el of Object.values(result.c5.quadro)) {
     if (el.encontrado && !el.trecho.trim()) throw new Error('Elemento sem evidência');
-    excerpt(el.trecho);
+    el.trecho = excerpt(el.trecho);
   }
-  result.devolutiva.trechosParaRevisar.forEach(t => { if (!t.original.trim()) throw new Error('Trecho vazio'); excerpt(t.original); });
-  excerpt(result.notaZero.evidencia);
+  result.devolutiva.trechosParaRevisar.forEach(t => { if (!t.original.trim()) throw new Error('Trecho vazio'); t.original = excerpt(t.original); });
+  result.notaZero.evidencia = excerpt(result.notaZero.evidencia);
   return result;
 }
 
@@ -73,5 +82,5 @@ C4: articulação entre ideias, referenciação e coesão entre períodos e par�
 C5: proposta de intervenção articulada ao problema, com ação, agente, meio, efeito e detalhamento. Constatar o problema não equivale a propor uma ação. Respeito aos direitos humanos é obrigatório; violação implica zero apenas em C5.
 Não calcule notas somente por contagem de palavras, parágrafos ou elementos. Avalie qualidade e desenvolvimento. Não declare certeza sobre critérios que dependam da folha original, linhas manuscritas, textos motivadores ou condições especiais que não foram fornecidos.
 Indique risco de anulação apenas quando houver fundamento, como fuga total ao tema ou ausência do tipo dissertativo-argumentativo. Nunca anule automaticamente: a professora decide.
-Trechos e evidências devem ser cópias literais do texto, preservando erros. Não invente frases, erros nem referências. Para elemento ausente use encontrado=false e trecho vazio. Em dúvida descreva a limitação.
+Trechos e evidências devem ser cópias literais e contínuas do texto, preservando erros. Não invente frases, erros nem referências. Nunca junte trechos separados nem use reticências para omitir palavras. Não coloque a reescrita no campo de evidência: use o campo de reescrita. Para elemento ausente use encontrado=false e trecho vazio. Em dúvida descreva a limitação.
 Produza feedback específico com pontos fortes, melhorias, erros categorizados e orientações para reescrita. Não reescreva a redação inteira. A pontuação é uma sugestão de apoio, não uma nota oficial do Inep. Responda conforme o esquema JSON.`;

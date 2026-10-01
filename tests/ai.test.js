@@ -73,6 +73,17 @@ test('invalid grades and hallucinated excerpts rejected', () => {
   const badScore = result(); badScore.c1.sugerida=150; assert.throws(() => validateResult(badScore,'texto teste'));
   const invented = result(); invented.c1.trechos[0].trecho='inventado'; assert.throws(() => validateResult(invented,'texto teste'));
 });
+test('evidence tolerates only whitespace and returns the literal source', () => {
+  const source = 'texto\n\t teste';
+  assert.equal(validateResult(result(), source).c1.trechos[0].trecho, source);
+  for (const changed of ['texto alterado', 'Texto teste', 'texto, teste', 'texto … teste']) {
+    const bad = result(); bad.c1.trechos[0].trecho = changed;
+    assert.throws(() => validateResult(bad, source), /Trecho não encontrado/);
+  }
+  const regexText = result(); regexText.c1.trechos[0].trecho = '(texto) + teste?';
+  assert.equal(validateResult(regexText, '(texto)\n+\tteste?').c1.trechos[0].trecho, '(texto)\n+\tteste?');
+  assert.throws(() => validateResult(regexText, 'texto teste'), /Trecho não encontrado/);
+});
 test('provider schema omits unsupported lengths but local validation keeps them', () => {
   assert.equal(JSON.stringify(geminiSchema).includes('maxLength'), false);
   assert.deepEqual(geminiSchema.properties.c1.properties.sugerida.enum, [0,40,80,120,160,200]);
