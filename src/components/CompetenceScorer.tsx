@@ -119,14 +119,14 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
   return (
     <div className="space-y-6">
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-        As sugestões são calculadas por regras automáticas, sem um modelo de IA.
-        Confira o texto e revise cada competência antes de confirmar as notas.
+        As sugestões foram geradas pela IA Gemini. Confira os trechos e as justificativas
+        de cada competência. A professora revisa e define a nota final.
       </p>
       {/* Placar de Pontuação Total em Tempo Real */}
       <div className="bg-gradient-to-r from-brand-900 to-brand-800 text-white p-5 rounded-2xl shadow-md flex items-center justify-between">
         <div>
           <span className="text-xs font-bold text-brand-200 uppercase tracking-wider">
-            Pontuação Oficial Avalia ENEM
+            Pontuação em revisão pela professora
           </span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-4xl font-black">{notaFinal}</span>
@@ -168,7 +168,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
         <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
           <p className="font-semibold text-slate-700">
             <Sparkles className="w-3.5 h-3.5 inline mr-1 text-brand-600" />
-            Sugestão do Sistema: <span className="font-bold text-brand-700">{c1Sugerida}</span>
+            Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c1Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c1Justificativa}</p>
         </div>
@@ -206,7 +206,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
         <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
           <p className="font-semibold text-slate-700">
             <Sparkles className="w-3.5 h-3.5 inline mr-1 text-brand-600" />
-            Sugestão do Sistema: <span className="font-bold text-brand-700">{c2Sugerida}</span>
+            Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c2Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c2Justificativa}</p>
         </div>
@@ -244,7 +244,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
         <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
           <p className="font-semibold text-slate-700">
             <Sparkles className="w-3.5 h-3.5 inline mr-1 text-brand-600" />
-            Sugestão do Sistema: <span className="font-bold text-brand-700">{c3Sugerida}</span>
+            Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c3Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c3Justificativa}</p>
         </div>
@@ -282,7 +282,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
         <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
           <p className="font-semibold text-slate-700">
             <Sparkles className="w-3.5 h-3.5 inline mr-1 text-brand-600" />
-            Sugestão do Sistema: <span className="font-bold text-brand-700">{c4Sugerida}</span>
+            Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c4Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c4Justificativa}</p>
         </div>
@@ -391,7 +391,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
         <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
           <p className="font-semibold text-slate-700">
             <Sparkles className="w-3.5 h-3.5 inline mr-1 text-brand-600" />
-            Sugestão do Sistema: <span className="font-bold text-brand-700">{c5Sugerida}</span>
+            Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c5Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c5Justificativa}</p>
         </div>

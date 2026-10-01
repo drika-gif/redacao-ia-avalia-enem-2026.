@@ -596,7 +596,7 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                         "Revisei as notas e confirmo esta correção."
                       </span>
                       <span>
-                        A nota oficial registrada no banco de dados e na planilha será exatamente a nota confirmada por você:{' '}
+                        A nota registrada no banco de dados e na planilha será a nota confirmada por você:{' '}
                         <strong>{c1Final + c2Final + c3Final + c4Final + c5Final} pontos</strong>.
                       </span>
                     </div>
