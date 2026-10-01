@@ -19,11 +19,12 @@ const invoke = async (overrides = {}, reqOverride = {}) => {
       called = true;
       assert.equal(opts.headers['x-goog-api-key'], env.GEMINI_API_KEY);
       const body = JSON.parse(opts.body);
-      assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000 });
       const input = JSON.parse(body.contents[0].parts[0].text);
       assert.deepEqual(input.trechosFonte, { E001: 'texto teste' });
-      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(evidenceSchema(input.trechosFonte))), true);
-      for (const key of ['temperature', 'topP', 'topK', 'candidateCount'])
+      assert.deepEqual(body.generationConfig, { maxOutputTokens: 12000,
+        responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: evidenceSchema(input.trechosFonte) } } });
+      assert.equal(body.systemInstruction.parts[0].text.includes(JSON.stringify(evidenceSchema(input.trechosFonte))), false);
+      for (const key of ['temperature', 'topP', 'topK', 'candidateCount', 'responseMimeType', 'responseSchema', 'responseJsonSchema'])
         assert.equal(key in body.generationConfig, false, `${key} must not be sent to Gemini 3.8`);
       assert.equal(body.contents[0].parts[0].text.includes('nome_estudante'), false);
       const value = result(); value.c1.trechos[0].trecho = 'E001';

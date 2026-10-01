@@ -31,9 +31,12 @@ export function makeHandler({ env = process.env, fetcher = fetch, clientFactory 
       const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`, {
         method: 'POST', signal: AbortSignal.timeout(55000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown. Respeite este esquema: ${JSON.stringify(evidenceSchema(references))}\nLimite cada texto a 2000 caracteres.` }] },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: `${instruction}\nRetorne somente um objeto JSON, sem Markdown, conforme o esquema configurado na API. Limite cada texto a 2000 caracteres.` }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify({ ...input, trechosFonte: references }) }] }],
-          generationConfig: { maxOutputTokens: 12000 } })
+          // REST TextResponseFormat uses an enum, not the MIME string accepted
+          // by some SDKs. See ai.google.dev/api/generate-content#TextResponseFormat.
+          generationConfig: { maxOutputTokens: 12000,
+            responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: evidenceSchema(references) } } } })
       });
       if (!response.ok) {
         // Never expose Google's raw error body: it may contain input or credentials.
