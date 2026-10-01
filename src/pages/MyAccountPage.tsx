@@ -10,7 +10,8 @@ import {
   Check, 
   Download, 
   Upload, 
-  Settings 
+  Settings,
+  KeyRound 
 } from 'lucide-react';
 import { 
   getSupabaseCredentials, 
@@ -19,7 +20,7 @@ import {
 } from '../lib/supabase';
 
 export const MyAccountPage: React.FC = () => {
-  const { user, signOut, isConfigured } = useAuth();
+  const { user, signOut, isConfigured, setIsRecoveryMode } = useAuth();
   const [copiedSql, setCopiedSql] = useState(false);
   const [url, setUrl] = useState(getSupabaseCredentials().url);
   const [key, setKey] = useState(getSupabaseCredentials().key);
@@ -95,18 +96,29 @@ export const MyAccountPage: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (window.confirm('Deseja realmente sair da sua conta?')) {
-                signOut();
-              }
-            }}
-            className="bg-red-50 hover:bg-red-100 text-red-700 font-extrabold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-red-200 flex items-center justify-center gap-2"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Sair da Conta</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsRecoveryMode(true)}
+              className="bg-brand-50 hover:bg-brand-100 text-brand-700 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-brand-200 flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span>Alterar Senha</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Deseja realmente sair da sua conta?')) {
+                  signOut();
+                }
+              }}
+              className="bg-red-50 hover:bg-red-100 text-red-700 font-extrabold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-red-200 flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sair da Conta</span>
+            </button>
+          </div>
         </div>
       </div>
 

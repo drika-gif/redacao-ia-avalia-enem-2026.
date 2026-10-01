@@ -6,9 +6,12 @@ interface AuthContextType {
   user: ProfessorUser | null;
   loading: boolean;
   isConfigured: boolean;
+  isRecoveryMode: boolean;
+  setIsRecoveryMode: (val: boolean) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, nome: string) => Promise<{ needEmailConfirm: boolean }>;
   resetPassword: (email: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
   signOut: () => Promise<void>;
   enterDemoMode: () => void;
 }
@@ -21,10 +24,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<ProfessorUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   useEffect(() => {
     const creds = getSupabaseCredentials();
     setIsConfigured(creds.isConfigured);
+
+    // 0. Verifica se a URL contém parâmetros de recuperação de senha
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('type=recovery')) {
+        setIsRecoveryMode(true);
+      }
+    }
 
     // 1. Verifica se há um usuário demo ativo salvo localmente
     const savedDemo = localStorage.getItem(DEMO_USER_KEY);
@@ -52,7 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       });
 
-      const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsRecoveryMode(true);
+        }
         if (session?.user) {
           setUser({
             id: session.user.id,
@@ -145,7 +161,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Supabase não configurado.');
     }
 
-    const { error } = await client.auth.resetPasswordForEmail(email.trim());
+    const redirectUrl = typeof window !== 'undefined'
+      ? `${window.location.origin}/`
+      : 'https://redacao-ia-avalia-enem-2026.vercel.app/';
+
+    const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: redirectUrl,
+    });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const client = getSupabaseClient() || supabase;
+    if (!client) {
+      throw new Error('Supabase não configurado.');
+    }
+
+    const { error } = await client.auth.updateUser({
+      password: newPassword,
+    });
     if (error) throw error;
   };
 
@@ -178,9 +212,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loading,
         isConfigured,
+        isRecoveryMode,
+        setIsRecoveryMode,
         signIn,
         signUp,
         resetPassword,
+        updatePassword,
         signOut,
         enterDemoMode,
       }}

@@ -4,6 +4,7 @@ import { Correcao } from './types';
 import { DbService } from './lib/db';
 import { Navbar } from './components/Navbar';
 import { WelcomeModal } from './components/WelcomeModal';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { NewCorrectionPage } from './pages/NewCorrectionPage';
@@ -13,7 +14,7 @@ import { GenerateSpreadsheetPage } from './pages/GenerateSpreadsheetPage';
 import { MyAccountPage } from './pages/MyAccountPage';
 
 export const AppContent: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, isRecoveryMode, setIsRecoveryMode } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('inicio');
   const [correcoes, setCorrecoes] = useState<Correcao[]>([]);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
@@ -58,7 +59,16 @@ export const AppContent: React.FC = () => {
 
   // Se não autenticado -> Tela de Login / Cadastro
   if (!user) {
-    return <AuthPage />;
+    return (
+      <>
+        <AuthPage />
+        <ResetPasswordModal
+          isOpen={isRecoveryMode}
+          onClose={() => setIsRecoveryMode(false)}
+          canCancel={true}
+        />
+      </>
+    );
   }
 
   return (
@@ -104,6 +114,13 @@ export const AppContent: React.FC = () => {
 
         {currentTab === 'minha-conta' && <MyAccountPage />}
       </main>
+
+      {/* Modal de Recuperação / Redefinição de Senha */}
+      <ResetPasswordModal
+        isOpen={isRecoveryMode}
+        onClose={() => setIsRecoveryMode(false)}
+        canCancel={true}
+      />
 
       {/* Modal de Boas-vindas para primeiro uso */}
       <WelcomeModal isOpen={isWelcomeOpen} onClose={handleCloseWelcome} />
