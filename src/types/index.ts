@@ -53,6 +53,7 @@ export interface DevolutivaPedagogica {
 export interface Correcao {
   id: string;
   user_id?: string;
+  professor_nome?: string;
   iema_pleno: string;
   turma: string;
   nome_estudante: string;

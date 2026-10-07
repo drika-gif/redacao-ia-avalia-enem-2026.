@@ -201,6 +201,7 @@ export const EssaysListPage: React.FC<EssaysListPageProps> = ({
             <DevolutiveView
               correcao={viewingCorrecao}
               devolutiva={viewingCorrecao.relatorio_pedagogico}
+              professorRevisor={user?.nome}
             />
 
             <div className="mt-6 flex justify-end">

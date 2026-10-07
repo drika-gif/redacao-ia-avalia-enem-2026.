@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Correcao } from '../types';
 import { ExcelOficialGenerator } from '../lib/excel';
 import { 
@@ -18,6 +19,7 @@ interface GenerateSpreadsheetPageProps {
 export const GenerateSpreadsheetPage: React.FC<GenerateSpreadsheetPageProps> = ({
   correcoes,
 }) => {
+  const { user } = useAuth();
   const turmas = Array.from(new Set(correcoes.map((c) => c.turma).filter(Boolean)));
   const [selectedTurma, setSelectedTurma] = useState<string>(turmas[0] || 'todas');
   const [isExporting, setIsExporting] = useState(false);
@@ -48,7 +50,8 @@ export const GenerateSpreadsheetPage: React.FC<GenerateSpreadsheetPageProps> = (
       const { blob, filename } = await ExcelOficialGenerator.gerarPlanilhaOficial(
         filtradas,
         currentIema,
-        selectedTurma !== 'todas' ? selectedTurma : 'COMPLETA'
+        selectedTurma !== 'todas' ? selectedTurma : 'COMPLETA',
+        user?.nome
       );
 
       ExcelOficialGenerator.downloadBlob(blob, filename);

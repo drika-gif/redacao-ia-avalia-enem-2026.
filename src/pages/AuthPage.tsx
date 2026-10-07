@@ -11,10 +11,14 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { setStoredCredentials, getSupabaseCredentials, SUPABASE_SQL_SCHEMA } from '../lib/supabase';
+import { Footer } from '../components/Footer';
+import { AboutModal } from '../components/AboutModal';
+import { AUTHORSHIP } from '../constants/authorship';
 
 export const AuthPage: React.FC = () => {
   const { signIn, signUp, resetPassword, enterDemoMode } = useAuth();
   const [tab, setTab] = useState<'entrar' | 'cadastrar' | 'esqueci'>('entrar');
+  const [showAboutModal, setShowAboutModal] = useState(false);
   
   // Estados do formulário
   const [nome, setNome] = useState('');
@@ -128,29 +132,35 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      {/* Top Banner de Privacidade */}
-      <div className="text-center mb-6">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 border border-brand-200">
-          <span>🔒</span>
-          <span>Acesso individual e restrito para professoras e professores</span>
-        </span>
-      </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+      <div className="flex-1 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
+        {/* Top Banner de Privacidade */}
+        <div className="text-center mb-6">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-brand-100 text-brand-800 border border-brand-200">
+            <span>🔒</span>
+            <span>Acesso individual e restrito para professoras e professores</span>
+          </span>
+        </div>
 
-      <div className="max-w-md w-full mx-auto bg-white rounded-2xl border border-slate-200 p-8 shadow-xl">
+        <div className="max-w-md w-full mx-auto bg-white rounded-2xl border border-slate-200 p-8 shadow-xl">
         {/* Identidade */}
         <div className="text-center mb-6">
           <div className="w-14 h-14 bg-brand-700 text-white rounded-2xl flex items-center justify-center font-black text-xl mx-auto shadow-md mb-3">
             IA
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            REDAÇÃO IA
+            {AUTHORSHIP.appName}
           </h1>
-          <p className="text-sm font-bold text-brand-700">Corretor Avalia ENEM 2026</p>
-          <p className="text-xs text-slate-500 mt-1 italic">
+          <p className="text-sm font-bold text-brand-700">{AUTHORSHIP.appSubtitle}</p>
+          <div className="mt-2.5">
+            <span className="inline-block px-3 py-1 bg-brand-50 border border-brand-200 text-brand-800 rounded-full text-xs font-bold shadow-xs">
+              {AUTHORSHIP.homeCreationBadge}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-2 italic">
             "Da fotografia da redação à planilha final."
           </p>
-          <p className="text-xs text-slate-700 mt-3">
+          <p className="text-xs text-slate-600 mt-2">
             Projeto pedagógico da Professora Adriana Aguiar.
             Não é um serviço oficial do Inep ou do ENEM.
           </p>
@@ -423,8 +433,21 @@ export const AuthPage: React.FC = () => {
               <span>Configurar Supabase</span>
             </button>
           </div>
+
+          <div className="pt-4 border-t border-slate-100 space-y-0.5">
+            <p className="text-xs font-bold text-slate-800">
+              {AUTHORSHIP.createdAndDevelopedBy}
+            </p>
+            <p className="text-[11px] text-slate-500 font-medium">
+              {AUTHORSHIP.copyright}
+            </p>
+          </div>
         </div>
       </div>
+      </div>
+
+      {/* Rodapé de Autoria */}
+      <Footer onOpenAbout={() => setShowAboutModal(true)} />
 
       {/* Modal de Configuração do Supabase */}
       {showConfigModal && (
@@ -490,6 +513,12 @@ export const AuthPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Sobre o Aplicativo */}
+      <AboutModal
+        isOpen={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+      />
     </div>
   );
 };

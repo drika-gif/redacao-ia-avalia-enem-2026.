@@ -273,6 +273,7 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
         motivo_nota_zero: isNotaZeroConfirmada ? zeroData?.motivo : '',
         relatorio_pedagogico: devolutiva,
         observacoes,
+        professor_nome: user?.nome || undefined,
       };
 
       await DbService.save(nova as Correcao, user?.id || null);
@@ -753,8 +754,10 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                   c5_final: c5Final,
                   nota_final: c1Final + c2Final + c3Final + c4Final + c5Final,
                   observacoes,
+                  professor_nome: user?.nome,
                 }}
                 devolutiva={devolutiva}
+                professorRevisor={user?.nome}
               />
 
               {/* Bloco de Confirmação e Salvamento */}

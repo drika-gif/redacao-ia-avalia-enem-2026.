@@ -3,6 +3,8 @@ import { useAuth } from './context/AuthContext';
 import { Correcao } from './types';
 import { DbService } from './lib/db';
 import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
+import { AboutModal } from './components/AboutModal';
 import { WelcomeModal } from './components/WelcomeModal';
 import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { AuthPage } from './pages/AuthPage';
@@ -18,6 +20,7 @@ export const AppContent: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('inicio');
   const [correcoes, setCorrecoes] = useState<Correcao[]>([]);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   // Carrega as correções exclusivas desta professora
   const carregarDados = async () => {
@@ -115,6 +118,9 @@ export const AppContent: React.FC = () => {
         {currentTab === 'minha-conta' && <MyAccountPage />}
       </main>
 
+      {/* Rodapé de Autoria Global */}
+      <Footer onOpenAbout={() => setIsAboutOpen(true)} />
+
       {/* Modal de Recuperação / Redefinição de Senha */}
       <ResetPasswordModal
         isOpen={isRecoveryMode}
@@ -124,6 +130,9 @@ export const AppContent: React.FC = () => {
 
       {/* Modal de Boas-vindas para primeiro uso */}
       <WelcomeModal isOpen={isWelcomeOpen} onClose={handleCloseWelcome} />
+
+      {/* Modal Sobre o Aplicativo */}
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );
 };

@@ -198,12 +198,16 @@ git push -u origin main
 
 ---
 
-## 🛡️ Importante para Segurança
+## 👩‍🏫 Autoria e Concepção Pedagógica
 
-- **Chave Pública (Anon Key):** O frontend utiliza exclusivamente a `anon/public key` do Supabase. Toda a segurança dos dados é assegurada pelas políticas de **Row Level Security (RLS)** executadas diretamente no banco de dados.
-- **Nunca utilize a `service_role key`** no frontend, pois ela ignora as regras do RLS.
-- O arquivo `.env` está incluso no `.gitignore` para impedir que dados sensíveis sejam enviados ao GitHub.
+**Aplicativo criado e desenvolvido pela professora Adriana Aguiar, de forma independente.**
+
+- **Finalidade:** Apoiar professores na análise de redações e na organização das notas, desde a captura fotográfica do texto manuscrito até a geração da planilha oficial.
+- **Validação Docente:** As avaliações e notas sugeridas pela inteligência artificial atuam como subsídio pedagógico e devem ser sempre revisadas e validadas pelo(a) professor(a) responsável.
+- **Uso Institucional:** A instituição IEMA é usuária da ferramenta em suas atividades pedagógicas formativas. O desenvolvimento, código-fonte e concepção foram realizados de forma autônoma e independente pela professora Adriana Aguiar.
+- **Direitos Autorais:** © 2026 Adriana Aguiar. Todos os direitos reservados. Consulte [AUTHORS.md](AUTHORS.md) para detalhes de autoria e licenças dos componentes de terceiros.
 
 ---
 
-*Coordenação de Avaliação e Inteligência Pedagógica / IEMA - 2026*
+*Aplicativo criado e desenvolvido pela professora Adriana Aguiar.*  
+*Ferramenta pedagógica para acompanhamento do Avalia ENEM 2026.*

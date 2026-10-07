@@ -8,13 +8,19 @@ import {
   Bookmark, 
   FileCheck2 
 } from 'lucide-react';
+import { AUTHORSHIP } from '../constants/authorship';
 
 interface DevolutiveViewProps {
   correcao: Partial<Correcao>;
   devolutiva?: DevolutivaPedagogica;
+  professorRevisor?: string;
 }
 
-export const DevolutiveView: React.FC<DevolutiveViewProps> = ({ correcao, devolutiva }) => {
+export const DevolutiveView: React.FC<DevolutiveViewProps> = ({ 
+  correcao, 
+  devolutiva,
+  professorRevisor 
+}) => {
   const handlePrint = () => {
     window.print();
   };
@@ -80,7 +86,7 @@ export const DevolutiveView: React.FC<DevolutiveViewProps> = ({ correcao, devolu
           </div>
         </div>
 
-        {/* Dados do Estudante */}
+        {/* Dados do Estudante e Responsabilidade Pedagógica */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
           <div>
             <span className="text-slate-400 block font-bold text-[10px] uppercase">IEMA Pleno:</span>
@@ -94,9 +100,15 @@ export const DevolutiveView: React.FC<DevolutiveViewProps> = ({ correcao, devolu
             <span className="text-slate-400 block font-bold text-[10px] uppercase">Estudante:</span>
             <span className="font-bold text-slate-900 text-sm">{correcao.nome_estudante || '—'}</span>
           </div>
-          <div className="col-span-2 sm:col-span-4 mt-1 border-t border-slate-200 pt-1.5">
+          <div className="col-span-2 sm:col-span-2 mt-1 border-t border-slate-200 pt-1.5">
             <span className="text-slate-400 block font-bold text-[10px] uppercase">Tema da Redação:</span>
             <span className="font-semibold text-slate-800">{correcao.tema || '—'}</span>
+          </div>
+          <div className="col-span-2 sm:col-span-2 mt-1 border-t border-slate-200 pt-1.5">
+            <span className="text-slate-400 block font-bold text-[10px] uppercase">Professor(a) Revisor(a):</span>
+            <span className="font-semibold text-slate-800">
+              {professorRevisor || correcao.professor_nome || 'Revisado pelo(a) professor(a) responsável'}
+            </span>
           </div>
         </div>
 
@@ -226,6 +238,26 @@ export const DevolutiveView: React.FC<DevolutiveViewProps> = ({ correcao, devolu
             <p className="text-slate-700 whitespace-pre-wrap">{correcao.observacoes}</p>
           </div>
         )}
+
+        {/* Rodapé do Relatório / Ficha Impressa */}
+        <div className="mt-8 pt-4 border-t-2 border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between text-slate-500 text-xs gap-3">
+          <div className="space-y-0.5">
+            <p className="font-bold text-slate-700">
+              {AUTHORSHIP.fileFooter}
+            </p>
+            <p className="text-[11px] text-slate-400">
+              {AUTHORSHIP.copyright}
+            </p>
+          </div>
+          <div className="text-left sm:text-right text-[11px] text-slate-600 bg-slate-50 sm:bg-transparent p-2.5 sm:p-0 rounded-lg sm:rounded-none border sm:border-0 border-slate-200 w-full sm:w-auto">
+            <span className="text-slate-400 block font-semibold text-[10px] uppercase">
+              {AUTHORSHIP.reviewingTeacherLabel}
+            </span>
+            <span className="font-bold text-slate-800">
+              {professorRevisor || correcao.professor_nome || 'Revisado pelo(a) professor(a) responsável'}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

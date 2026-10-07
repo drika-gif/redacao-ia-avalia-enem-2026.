@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
-import { Correcao } from '../types';
+import { Correcao } from '../types/index';
+import { AUTHORSHIP } from '../constants/authorship';
 
 export class ExcelOficialGenerator {
   static escapeXml(str: string | number | null | undefined): string {
@@ -23,61 +24,88 @@ export class ExcelOficialGenerator {
   }
 
   /**
-   * Gera o arquivo XLSX oficial com Planilha1 e Planilha2 de forma autônoma
+   * Gera o arquivo XLSX oficial com Planilha1, Planilha2 e a aba complementar Sobre.
+   * Preserva rigorosamente as 9 colunas oficiais, fórmulas de soma e metadados de autoria.
    */
   static async gerarPlanilhaOficial(
     correcoes: Correcao[],
     iemaPlenoDefault: string = 'IEMA PLENO',
-    turmaDefault: string = 'TURMA'
+    turmaDefault: string = 'TURMA',
+    professorRevisorDefault?: string
   ): Promise<{ blob: Blob; filename: string }> {
     const zip = new JSZip();
+
+    const revTeacher =
+      professorRevisorDefault ||
+      correcoes.find((c) => c.professor_nome)?.professor_nome ||
+      'Revisado pelo(a) professor(a) responsável';
 
     // 1. [Content_Types].xml
     const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 </Types>`;
     zip.file('[Content_Types].xml', contentTypesXml);
 
-    // 2. _rels/.rels
+    // 2. docProps/core.xml (Metadados OOXML oficiais - Autora: Adriana Aguiar)
+    const corePropsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:dcmitype="http://purl.org/dc/dcmitype/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:title>${this.escapeXml(AUTHORSHIP.spreadsheetTitle)}</dc:title>
+  <dc:creator>${this.escapeXml(AUTHORSHIP.spreadsheetCreator)}</dc:creator>
+  <cp:lastModifiedBy>${this.escapeXml(AUTHORSHIP.spreadsheetCreator)}</cp:lastModifiedBy>
+  <dc:description>${this.escapeXml(AUTHORSHIP.fileFooter)}</dc:description>
+</cp:coreProperties>`;
+    zip.file('docProps/core.xml', corePropsXml);
+
+    // 3. _rels/.rels
     const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
 </Relationships>`;
     zip.file('_rels/.rels', relsXml);
 
-    // 3. xl/_rels/workbook.xml.rels
+    // 4. xl/_rels/workbook.xml.rels
     const wbRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
 </Relationships>`;
     zip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
 
-    // 4. xl/workbook.xml
+    // 5. xl/workbook.xml (Abas: Planilha1, Planilha2, Sobre)
     const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
     <sheet name="Planilha1" sheetId="1" r:id="rId1"/>
     <sheet name="Planilha2" sheetId="2" r:id="rId2"/>
+    <sheet name="${AUTHORSHIP.spreadsheetAboutTabName}" sheetId="3" r:id="rId4"/>
   </sheets>
 </workbook>`;
     zip.file('xl/workbook.xml', workbookXml);
 
-    // 5. xl/styles.xml
+    // 6. xl/styles.xml
     const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="4">
+  <fonts count="5">
     <font><sz val="11"/><name val="Calibri"/></font>
     <font><b/><sz val="14"/><color rgb="FF1E3A8A"/><name val="Calibri"/></font>
     <font><i/><sz val="11"/><color rgb="FF475569"/><name val="Calibri"/></font>
     <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FF1E293B"/><name val="Calibri"/></font>
   </fonts>
   <fills count="4">
     <fill><patternFill patternType="none"/></fill>
@@ -97,7 +125,7 @@ export class ExcelOficialGenerator {
   <cellStyleXfs count="1">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
   </cellStyleXfs>
-  <cellXfs count="6">
+  <cellXfs count="8">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">
       <alignment horizontal="center" vertical="center"/>
@@ -114,11 +142,17 @@ export class ExcelOficialGenerator {
     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1">
       <alignment horizontal="center" vertical="center"/>
     </xf>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1">
+      <alignment horizontal="left" vertical="center"/>
+    </xf>
+    <xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="left" vertical="center"/>
+    </xf>
   </cellXfs>
 </styleSheet>`;
     zip.file('xl/styles.xml', stylesXml);
 
-    // 6. xl/worksheets/sheet1.xml (Planilha1)
+    // 7. xl/worksheets/sheet1.xml (Planilha1 Oficial - Preservando 9 colunas A-I)
     let sheet1Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <cols>
@@ -182,16 +216,33 @@ export class ExcelOficialGenerator {
       rowIndex++;
     }
 
+    // Inclusão da autoria em área livre (2 linhas abaixo do último estudante)
+    const freeRow1 = rowIndex + 1;
+    const freeRow2 = rowIndex + 2;
+    const freeRow3 = rowIndex + 3;
+
     sheet1Xml += `
+    <row r="${freeRow1}" ht="20" customHeight="1">
+      <c r="A${freeRow1}" s="6" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.fileFooter)}</t></is></c>
+    </row>
+    <row r="${freeRow2}" ht="20" customHeight="1">
+      <c r="A${freeRow2}" s="6" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.reviewingTeacherLabel)} ${this.escapeXml(revTeacher)}</t></is></c>
+    </row>
+    <row r="${freeRow3}" ht="20" customHeight="1">
+      <c r="A${freeRow3}" s="6" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.copyright)} Detalhes na aba &apos;${AUTHORSHIP.spreadsheetAboutTabName}&apos;.</t></is></c>
+    </row>
   </sheetData>
-  <mergeCells count="2">
+  <mergeCells count="5">
     <mergeCell ref="A1:I1"/>
     <mergeCell ref="A2:I2"/>
+    <mergeCell ref="A${freeRow1}:I${freeRow1}"/>
+    <mergeCell ref="A${freeRow2}:I${freeRow2}"/>
+    <mergeCell ref="A${freeRow3}:I${freeRow3}"/>
   </mergeCells>
 </worksheet>`;
     zip.file('xl/worksheets/sheet1.xml', sheet1Xml);
 
-    // 7. xl/worksheets/sheet2.xml (Planilha2 com escala oficial de pontuação)
+    // 8. xl/worksheets/sheet2.xml (Planilha2 com escala oficial de pontuação)
     const sheet2Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <cols>
@@ -211,7 +262,58 @@ export class ExcelOficialGenerator {
 </worksheet>`;
     zip.file('xl/worksheets/sheet2.xml', sheet2Xml);
 
-    // 8. Gera o blob binário do arquivo .xlsx
+    // 9. xl/worksheets/sheet3.xml (Aba complementar 'Sobre' com identificação detalhada)
+    const sheet3Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <cols>
+    <col min="1" max="1" width="32" customWidth="1"/>
+    <col min="2" max="2" width="85" customWidth="1"/>
+  </cols>
+  <sheetData>
+    <row r="1" ht="28" customHeight="1">
+      <c r="A1" s="1" t="inlineStr"><is><t>REDAÇÃO IA - AVALIA ENEM 2026</t></is></c>
+    </row>
+    <row r="2" ht="20" customHeight="1">
+      <c r="A2" s="2" t="inlineStr"><is><t>INFORMAÇÕES DE AUTORIA E USO DO APLICATIVO</t></is></c>
+    </row>
+    <row r="3" ht="12"/>
+    <row r="4" ht="24" customHeight="1">
+      <c r="A4" s="7" t="inlineStr"><is><t>Autoria do Aplicativo:</t></is></c>
+      <c r="B4" s="4" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.createdAndDevelopedBy)}</t></is></c>
+    </row>
+    <row r="5" ht="24" customHeight="1">
+      <c r="A5" s="7" t="inlineStr"><is><t>Direitos Autorais:</t></is></c>
+      <c r="B5" s="4" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.copyright)}</t></is></c>
+    </row>
+    <row r="6" ht="24" customHeight="1">
+      <c r="A6" s="7" t="inlineStr"><is><t>Concepção e Desenvolvimento:</t></is></c>
+      <c r="B6" s="4" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.aboutText)}</t></is></c>
+    </row>
+    <row r="7" ht="24" customHeight="1">
+      <c r="A7" s="7" t="inlineStr"><is><t>Uso Institucional:</t></is></c>
+      <c r="B7" s="4" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.institutionClarification)}</t></is></c>
+    </row>
+    <row r="8" ht="24" customHeight="1">
+      <c r="A8" s="7" t="inlineStr"><is><t>${this.escapeXml(AUTHORSHIP.reviewingTeacherLabel)}</t></is></c>
+      <c r="B8" s="4" t="inlineStr"><is><t>${this.escapeXml(revTeacher)}</t></is></c>
+    </row>
+    <row r="9" ht="24" customHeight="1">
+      <c r="A9" s="7" t="inlineStr"><is><t>Responsabilidade das Notas:</t></is></c>
+      <c r="B9" s="4" t="inlineStr"><is><t>As avaliações sugeridas pela inteligência artificial foram revisadas e validadas pelo(a) professor(a) responsável.</t></is></c>
+    </row>
+    <row r="10" ht="24" customHeight="1">
+      <c r="A10" s="7" t="inlineStr"><is><t>Estrutura Oficial:</t></is></c>
+      <c r="B10" s="4" t="inlineStr"><is><t>A Planilha1 preserva o modelo de 9 colunas e a fórmula =SUM(D:H) para cálculo da Nota Final.</t></is></c>
+    </row>
+  </sheetData>
+  <mergeCells count="2">
+    <mergeCell ref="A1:B1"/>
+    <mergeCell ref="A2:B2"/>
+  </mergeCells>
+</worksheet>`;
+    zip.file('xl/worksheets/sheet3.xml', sheet3Xml);
+
+    // 10. Gera o blob binário do arquivo .xlsx
     const blob = await zip.generateAsync({
       type: 'blob',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

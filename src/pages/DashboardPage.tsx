@@ -12,6 +12,7 @@ import {
   Users, 
   GraduationCap 
 } from 'lucide-react';
+import { AUTHORSHIP } from '../constants/authorship';
 
 interface DashboardPageProps {
   correcoes: Correcao[];
@@ -44,9 +45,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ correcoes, onNavig
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-extrabold uppercase tracking-widest text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100">
-              Painel Pedagógico Avalia ENEM 2026
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-extrabold uppercase tracking-widest text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-100">
+                Painel Pedagógico Avalia ENEM 2026
+              </span>
+              <span className="text-xs font-bold text-brand-800 bg-brand-100/70 px-2.5 py-1 rounded-md border border-brand-200">
+                {AUTHORSHIP.homeCreationBadge}
+              </span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2 tracking-tight">
               Olá, professora {user?.nome ? user.nome.split(' ')[0] : ''}!
             </h1>

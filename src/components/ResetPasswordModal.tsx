@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+import { AUTHORSHIP } from '../constants/authorship';
+
 interface ResetPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -163,6 +165,15 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             </div>
           </form>
         )}
+
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center space-y-0.5">
+          <p className="text-xs font-bold text-slate-800">
+            {AUTHORSHIP.createdAndDevelopedBy}
+          </p>
+          <p className="text-[11px] text-slate-500 font-medium">
+            {AUTHORSHIP.copyright}
+          </p>
+        </div>
       </div>
     </div>
   );

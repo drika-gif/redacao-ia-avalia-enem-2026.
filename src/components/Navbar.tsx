@@ -10,6 +10,7 @@ import {
   Home,
   Sparkles
 } from 'lucide-react';
+import { AUTHORSHIP } from '../constants/authorship';
 
 interface NavbarProps {
   currentTab: string;
@@ -45,8 +46,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, totalCo
                   Avalia ENEM 2026
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium hidden sm:block">
-                Da fotografia da redação à planilha final.
+              <p className="text-[11px] text-brand-700 font-semibold hidden sm:block">
+                {AUTHORSHIP.homeCreationBadge}
               </p>
             </div>
           </div>
