@@ -81,7 +81,7 @@ export const TranscriptionView: React.FC<TranscriptionViewProps> = ({
     <div className="space-y-4">
       <p className="text-sm text-slate-600">Ao confirmar, o texto e o tema serão enviados ao Gemini para sugerir notas. Revise a transcrição antes de continuar.</p>
       {error && <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700">{error}</p>}
-      {busy && <p role="status" className="p-3 rounded-xl bg-blue-50 text-blue-700">Analisando com IA. Aguarde, isso pode levar até um minuto.</p>}
+      {busy && <p role="status" className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-brand-700">Analisando com IA. Aguarde, isso pode levar até um minuto.</p>}
       {/* Botões superiores */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200">
         <div className="flex items-center gap-2">

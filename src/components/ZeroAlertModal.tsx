@@ -63,7 +63,7 @@ export const ZeroAlertModal: React.FC<ZeroAlertModalProps> = ({
             </p>
           </div>
 
-          <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-900 leading-relaxed flex items-start gap-2">
+          <div className="p-3 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-900 leading-relaxed flex items-start gap-2">
             <span>ℹ️</span>
             <span>
               <strong>Atenção:</strong> A decisão final é sempre soberana da professora. Se a redação tratar-se de desrespeito a Direitos Humanos, apenas a Competência V deve receber nota 0.

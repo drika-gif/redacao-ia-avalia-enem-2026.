@@ -77,7 +77,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ correcoes, onNavig
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Redações Corrigidas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+          <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-700 border border-brand-100 flex items-center justify-center font-bold">
             <Files className="w-6 h-6" />
           </div>
           <div>
@@ -90,7 +90,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ correcoes, onNavig
 
         {/* Turmas Cadastradas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+          <div className="w-12 h-12 rounded-xl bg-brand-100 text-brand-800 border border-brand-200 flex items-center justify-center font-bold">
             <Users className="w-6 h-6" />
           </div>
           <div>

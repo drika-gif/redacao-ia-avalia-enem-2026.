@@ -26,7 +26,15 @@ export const schema = object({
     pontosFortes: list,
     precisaMelhorar: list,
     errosCategorizados: object({ ortografia: list, pontuacao: list, concordancia: list, estrutura: list, argumentacao: list, coesao: list, propostaDeIntervencao: list }),
-    trechosParaRevisar: { type: 'array', maxItems: 8, items: object({ original: text, problema: text, orientacao: text }) }
+    trechosParaRevisar: { type: 'array', maxItems: 8, items: object({ original: text, problema: text, orientacao: text }) },
+    abordagemTema: object({
+      fraseTema: text,
+      classificacao: text,
+      elementosDesenvolvidos: list,
+      recortesAusentes: list,
+      justificativa: text,
+      orientacao: text
+    })
   })
 });
 
@@ -220,7 +228,15 @@ function makeNovaFotoResult(result) {
     pontosFortes: [],
     precisaMelhorar: ['Enviar nova foto da redação com boa nitidez e iluminação.'],
     errosCategorizados: { ortografia: [], pontuacao: [], concordancia: [], estrutura: [], argumentacao: [], coesao: [], propostaDeIntervencao: [] },
-    trechosParaRevisar: []
+    trechosParaRevisar: [],
+    abordagemTema: {
+      fraseTema: '',
+      classificacao: 'Pendente',
+      elementosDesenvolvidos: [],
+      recortesAusentes: [],
+      justificativa: 'Avaliação temática pendente até o envio de nova foto legível.',
+      orientacao: 'Tire uma foto nítida e bem iluminada para possibilitar a avaliação temática completa.'
+    }
   };
   return result;
 }
@@ -286,6 +302,49 @@ function sanitizeImageResult(result) {
       }))
     : [];
 
+  result.devolutiva.abordagemTema = result.devolutiva.abordagemTema || {};
+  result.devolutiva.abordagemTema.fraseTema = typeof result.devolutiva.abordagemTema.fraseTema === 'string'
+    ? result.devolutiva.abordagemTema.fraseTema.slice(0, 2000) : '';
+
+  const validClassificacoes = ['Abordagem completa', 'Tangenciamento', 'Fuga total', 'Pendente'];
+  let classif = typeof result.devolutiva.abordagemTema.classificacao === 'string'
+    ? result.devolutiva.abordagemTema.classificacao.trim() : 'Abordagem completa';
+  if (!validClassificacoes.includes(classif)) {
+    const classifLower = classif.toLowerCase();
+    if (classifLower.includes('tangen')) classif = 'Tangenciamento';
+    else if (classifLower.includes('fuga')) classif = 'Fuga total';
+    else classif = 'Abordagem completa';
+  }
+  result.devolutiva.abordagemTema.classificacao = classif;
+
+  result.devolutiva.abordagemTema.elementosDesenvolvidos = Array.isArray(result.devolutiva.abordagemTema.elementosDesenvolvidos)
+    ? result.devolutiva.abordagemTema.elementosDesenvolvidos.filter(e => typeof e === 'string').slice(0, 12) : [];
+  result.devolutiva.abordagemTema.recortesAusentes = Array.isArray(result.devolutiva.abordagemTema.recortesAusentes)
+    ? result.devolutiva.abordagemTema.recortesAusentes.filter(r => typeof r === 'string').slice(0, 12) : [];
+
+  result.devolutiva.abordagemTema.justificativa = typeof result.devolutiva.abordagemTema.justificativa === 'string' && result.devolutiva.abordagemTema.justificativa.trim()
+    ? result.devolutiva.abordagemTema.justificativa.slice(0, 2000)
+    : 'Avaliação da abordagem temática com base na leitura da redação.';
+
+  result.devolutiva.abordagemTema.orientacao = typeof result.devolutiva.abordagemTema.orientacao === 'string' && result.devolutiva.abordagemTema.orientacao.trim()
+    ? result.devolutiva.abordagemTema.orientacao.slice(0, 2000)
+    : 'Desenvolva tanto o tema central quanto seus recortes específicos na argumentação.';
+
+  if (classif === 'Tangenciamento') {
+    result.c2.sugerida = 80;
+    if (!result.devolutiva.abordagemTema.justificativa.includes('O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta')) {
+      const recortesStr = result.devolutiva.abordagemTema.recortesAusentes.length > 0
+        ? `: ${result.devolutiva.abordagemTema.recortesAusentes.join(', ')}.`
+        : '.';
+      result.devolutiva.abordagemTema.justificativa = `O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta${recortesStr} ${result.devolutiva.abordagemTema.justificativa}`.trim();
+    }
+  } else if (classif === 'Fuga total') {
+    result.c2.sugerida = 0;
+    result.notaZero.isZeroRisk = true;
+    result.notaZero.motivo = result.notaZero.motivo || 'Fuga total ao tema';
+    result.notaZero.explicacao = result.notaZero.explicacao || 'O texto não desenvolve o tema proposto, configurando Fuga Total.';
+  }
+
   const allowedRootKeys = Object.keys(schema.properties);
   for (const k of Object.keys(result)) {
     if (!allowedRootKeys.includes(k)) delete result[k];
@@ -332,6 +391,41 @@ export function validateResult(result, transcricao, references, options = {}) {
     }
 
     sanitizeImageResult(result);
+  }
+
+  // Garante que abordagemTema exista e cumpra a rubrica oficial
+  if (result.devolutiva) {
+    result.devolutiva.abordagemTema = result.devolutiva.abordagemTema || {
+      fraseTema: '',
+      classificacao: 'Abordagem completa',
+      elementosDesenvolvidos: [],
+      recortesAusentes: [],
+      justificativa: '',
+      orientacao: ''
+    };
+    if (typeof result.devolutiva.abordagemTema.fraseTema !== 'string') result.devolutiva.abordagemTema.fraseTema = '';
+    if (typeof result.devolutiva.abordagemTema.classificacao !== 'string') result.devolutiva.abordagemTema.classificacao = 'Abordagem completa';
+    if (!Array.isArray(result.devolutiva.abordagemTema.elementosDesenvolvidos)) result.devolutiva.abordagemTema.elementosDesenvolvidos = [];
+    if (!Array.isArray(result.devolutiva.abordagemTema.recortesAusentes)) result.devolutiva.abordagemTema.recortesAusentes = [];
+    if (typeof result.devolutiva.abordagemTema.justificativa !== 'string') result.devolutiva.abordagemTema.justificativa = '';
+    if (typeof result.devolutiva.abordagemTema.orientacao !== 'string') result.devolutiva.abordagemTema.orientacao = '';
+
+    if (result.devolutiva.abordagemTema.classificacao === 'Tangenciamento') {
+      result.c2.sugerida = 80;
+      if (result.devolutiva.abordagemTema.justificativa && !result.devolutiva.abordagemTema.justificativa.includes('O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta')) {
+        const recortesStr = result.devolutiva.abordagemTema.recortesAusentes.length > 0
+          ? `: ${result.devolutiva.abordagemTema.recortesAusentes.join(', ')}.`
+          : '.';
+        result.devolutiva.abordagemTema.justificativa = `O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta${recortesStr} ${result.devolutiva.abordagemTema.justificativa}`.trim();
+      }
+    } else if (result.devolutiva.abordagemTema.classificacao === 'Fuga total') {
+      result.c2.sugerida = 0;
+      if (result.notaZero) {
+        result.notaZero.isZeroRisk = true;
+        result.notaZero.motivo = result.notaZero.motivo || 'Fuga total ao tema';
+        result.notaZero.explicacao = result.notaZero.explicacao || 'O texto não desenvolve o tema proposto, configurando Fuga Total.';
+      }
+    }
   }
 
   // Foto legível: validação do esquema
@@ -444,18 +538,46 @@ DIRETRIZES FUNDAMENTAIS DE LEITURA E NITIDEZ:
 2. Nitidez e Trechos Ilegíveis: Quando uma palavra ou trecho estiver ilegível, borrado ou cortado na foto, transcreva como "[trecho ilegível]" e registre a observação em "limitacoesLeitura".
 3. NÃO invente palavras, NÃO complete lacunas por adivinhação e NÃO deduza erros gramaticais onde houver apenas falta de nitidez na foto.
 4. NÃO penalize a aluna nas notas das competências por problemas de qualidade da imagem, iluminação ou corte da foto.
-5. Verificação de Confiabilidade: Se a foto estiver excessivamente escura, cortada, desfocada ou se for impossível ler a maior parte do texto para uma avaliação justa e confiável, marque "precisaNovaFoto": true e descreva o motivo pedagógico em "motivoNovaFoto" (ex: "A foto está muito borrada e cortada nas margens, impedindo a leitura confiável dos parágrafos"). Nesse caso, mantenha notas 0 e justificativa orientando a captura de nova foto.
+5. Verificação de Confiabilidade: Se a foto estiver excessivamente escura, cortada, desfocada ou se for impossível ler a maior parte do texto para uma avaliação justa e confiável, marque "precisaNovaFoto": true e descreva o motivo pedagógico em "motivoNovaFoto". Nesse caso, mantenha notas 0 e justificativa orientando a captura de nova foto.
 6. Se a imagem permitir a leitura segura da redação, marque "precisaNovaFoto": false e "motivoNovaFoto": "".
 
+AVALIAÇÃO DA ABORDAGEM DO TEMA (TANGENCIAMENTO E PROPOSTA):
+1. Comparação com a Proposta:
+   - Identifique a frase-tema e seus principais elementos e recortes centrais.
+   - Compare esses elementos com a abordagem efetivamente desenvolvida pelo estudante.
+   - ATENÇÃO: NÃO considere que apenas mencionar palavras do tema seja suficiente para abordá-lo integralmente.
+   - Não deduza a proposta apenas pela redação; utilize estritamente a frase-tema indicada.
+2. Classificação da Abordagem em "devolutiva.abordagemTema":
+   - "Abordagem completa": desenvolve o tema e seus recortes centrais.
+   - "Tangenciamento": desenvolve apenas o assunto mais amplo ou uma parte do tema, deixando de abordar um recorte central da proposta (ex: discute o assunto amplo de meio ambiente sem abordar as comunidades tradicionais no Brasil, ou fala de internet sem abordar o controle de dados).
+   - "Fuga total": não desenvolve o tema proposto, tratando de assunto inteiramente desconectado.
+3. Cuidados Pedagógicos:
+   - NÃO classifique uma argumentação superficial como tangenciamento quando o texto aborda o tema completo. Essa dificuldade deve ser avaliada nas competências pertinentes (C3 e repertório na C2).
+   - NÃO confunda tangenciamento com fuga total.
+4. Pontuação e Rubrica:
+   - O Tangenciamento corresponde ao nível de 80 pontos na Competência II (C2 = 80).
+   - O Tangenciamento NÃO anula automaticamente a redação. Continue avaliando as demais competências (C1, C3, C4, C5) normalmente pelas orientações oficiais, sem criar descontos ou limites não previstos.
+   - Quando houver Fuga Total inequívoca, aponte risco de nota zero em "notaZero" (isZeroRisk: true) e C2 = 0, explicando a evidência.
+   - Se houver Abordagem Completa: C2 deve ser 120, 160 ou 200 pontos conforme a adequação do gênero e repertório legitimado, pertinente e produtivo.
+5. Devolutiva de Abordagem do Tema:
+   - Em "devolutiva.abordagemTema", preencha:
+     * "fraseTema": a frase-tema da redação.
+     * "classificacao": "Abordagem completa" | "Tangenciamento" | "Fuga total".
+     * "elementosDesenvolvidos": lista dos elementos do tema que foram efetivamente desenvolvidos.
+     * "recortesAusentes": lista dos recortes da proposta ausentes ou abordados apenas parcialmente.
+     * "justificativa": justificativa baseada em trechos legíveis da redação. Em caso de tangenciamento, formule de maneira respeitosa iniciando com:
+       "O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta: [especificar o recorte ausente]." (Não use essa frase de forma genérica sem analisar o texto).
+     * "orientacao": orientação pedagógica objetiva para o estudante aproximar sua argumentação da proposta nas próximas produções.
+
 AVALIAÇÃO DAS CINCO COMPETÊNCIAS (Notas discretas: 0, 40, 80, 120, 160, 200):
-- C1: Domínio da modalidade escrita formal da Língua Portuguesa (ortografia, concordância, regência, pontuação, sintaxe). Avalie apenas erros claramente visíveis; não assuma erro em trechos ilegíveis.
-- C2: Compreensão da proposta de redação e aplicação de conceitos das várias áreas do conhecimento dentro dos limites do texto dissertativo-argumentativo. Repertório legítimo, pertinente e produtivo.
-- C3: Seleção, relação, organização e interpretação de informações, fatos, opiniões e argumentos em defesa de um ponto de vista. Autoria e coerência no projeto de texto.
-- C4: Demonstração de conhecimento dos mecanismos linguísticos necessários para a construção da argumentação (coesão referencial e sequencial, conectivos inter e intraparágrafos).
-- C5: Elaboração de proposta de intervenção para a problemática abordada, respeitando os direitos humanos. Analise os 5 elementos: agente, ação, modo/meio, efeito e detalhamento de um dos anteriores. Violação aos direitos humanos zera apenas a C5.
+- C1: Domínio da modalidade escrita formal da Língua Portuguesa.
+- C2: Compreensão da proposta de redação e aplicação de conceitos das várias áreas do conhecimento (Tangenciamento = 80; Abordagem completa = 120, 160 ou 200).
+- C3: Seleção, relação, organização e interpretação de informações, fatos e argumentos em defesa de ponto de vista.
+- C4: Mecanismos linguísticos de coesão referencial e sequencial.
+- C5: Proposta de intervenção com os 5 elementos (agente, ação, modo, efeito e detalhamento). Violação de direitos humanos zera apenas a C5.
 
 REGRAS PEDAGÓGICAS E EVIDÊNCIAS:
-- Nunca anule automaticamente a redação inteira: aponte risco de nota zero em "notaZero" somente se houver fundamento legítimo como fuga total ao tema ou não atendimento ao tipo dissertativo-argumentativo. A decisão final cabe à professora.
-- As evidências e trechos citados em "trechos", "quadro" e "trechosParaRevisar" devem ser transcrições literais do texto da redação.
+- Nunca anule automaticamente a redação inteira sem fundamento: apenas se houver fuga total ao tema ou não atendimento ao gênero.
+- As evidências em "trechos", "quadro" e "trechosParaRevisar" devem ser transcrições literais do texto da redação.
 - Forneça feedback construtivo na devolutiva: pontos fortes, aspectos a aprimorar, erros categorizados e orientações claras de reescrita.
 - A avaliação gerada é uma sugestão de apoio técnico-pedagógico à professora, que revisará e validará cada nota. Responda estritamente no formato JSON solicitado.`;

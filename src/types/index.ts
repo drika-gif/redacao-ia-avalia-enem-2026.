@@ -31,6 +31,17 @@ export interface AnaliseCompetencia {
   orientacao: string;
 }
 
+export type ClassificacaoAbordagemTema = 'Abordagem completa' | 'Tangenciamento' | 'Fuga total' | 'Pendente';
+
+export interface AbordagemTema {
+  fraseTema: string;
+  classificacao: ClassificacaoAbordagemTema;
+  elementosDesenvolvidos: string[];
+  recortesAusentes: string[];
+  justificativa: string;
+  orientacao: string;
+}
+
 export interface DevolutivaPedagogica {
   pontosFortes: string[];
   precisaMelhorar: string[];
@@ -48,6 +59,7 @@ export interface DevolutivaPedagogica {
     problema: string;
     orientacao: string;
   }[];
+  abordagemTema?: AbordagemTema;
 }
 
 export interface Correcao {

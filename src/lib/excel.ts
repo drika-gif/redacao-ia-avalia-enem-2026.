@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
-import { Correcao } from '../types/index';
-import { AUTHORSHIP } from '../constants/authorship';
+import type { Correcao } from '../types/index.ts';
+import { AUTHORSHIP } from '../constants/authorship.ts';
 
 export class ExcelOficialGenerator {
   static escapeXml(str: string | number | null | undefined): string {
@@ -50,6 +50,7 @@ export class ExcelOficialGenerator {
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
 </Types>`;
     zip.file('[Content_Types].xml', contentTypesXml);
@@ -83,16 +84,18 @@ export class ExcelOficialGenerator {
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/>
 </Relationships>`;
     zip.file('xl/_rels/workbook.xml.rels', wbRelsXml);
 
-    // 5. xl/workbook.xml (Abas: Planilha1, Planilha2, Sobre)
+    // 5. xl/workbook.xml (Abas: Planilha1, Planilha2, Devolutivas, Sobre)
     const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
     <sheet name="Planilha1" sheetId="1" r:id="rId1"/>
     <sheet name="Planilha2" sheetId="2" r:id="rId2"/>
-    <sheet name="${AUTHORSHIP.spreadsheetAboutTabName}" sheetId="3" r:id="rId4"/>
+    <sheet name="Devolutivas" sheetId="3" r:id="rId4"/>
+    <sheet name="${AUTHORSHIP.spreadsheetAboutTabName}" sheetId="4" r:id="rId5"/>
   </sheets>
 </workbook>`;
     zip.file('xl/workbook.xml', workbookXml);
@@ -262,8 +265,87 @@ export class ExcelOficialGenerator {
 </worksheet>`;
     zip.file('xl/worksheets/sheet2.xml', sheet2Xml);
 
-    // 9. xl/worksheets/sheet3.xml (Aba complementar 'Sobre' com identificação detalhada)
-    const sheet3Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    // 9. xl/worksheets/sheet3.xml (Aba complementar 'Devolutivas' com Abordagem do Tema vinculada aos estudantes)
+    let sheet3Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <cols>
+    <col min="1" max="1" width="28" customWidth="1"/>
+    <col min="2" max="2" width="16" customWidth="1"/>
+    <col min="3" max="3" width="36" customWidth="1"/>
+    <col min="4" max="4" width="40" customWidth="1"/>
+    <col min="5" max="5" width="24" customWidth="1"/>
+    <col min="6" max="6" width="35" customWidth="1"/>
+    <col min="7" max="7" width="60" customWidth="1"/>
+    <col min="8" max="8" width="50" customWidth="1"/>
+    <col min="9" max="9" width="14" customWidth="1"/>
+    <col min="10" max="10" width="14" customWidth="1"/>
+  </cols>
+  <sheetData>
+    <row r="1" ht="28" customHeight="1">
+      <c r="A1" s="1" t="inlineStr"><is><t>DEVOLUTIVAS PEDAGÓGICAS E AVALIAÇÃO TEMÁTICA • AVALIA ENEM 2026</t></is></c>
+    </row>
+    <row r="2" ht="20" customHeight="1">
+      <c r="A2" s="2" t="inlineStr"><is><t>COORDENAÇÃO DE AVALIAÇÃO E INTELIGÊNCIA PEDAGÓGICA • IEMA</t></is></c>
+    </row>
+    <row r="3" ht="12"/>
+    <row r="4" ht="26" customHeight="1">
+      <c r="A4" s="3" t="inlineStr"><is><t>IEMA PLENO</t></is></c>
+      <c r="B4" s="3" t="inlineStr"><is><t>TURMA</t></is></c>
+      <c r="C4" s="3" t="inlineStr"><is><t>NOME DO ESTUDANTE</t></is></c>
+      <c r="D4" s="3" t="inlineStr"><is><t>TEMA DA REDAÇÃO</t></is></c>
+      <c r="E4" s="3" t="inlineStr"><is><t>ABORDAGEM DO TEMA</t></is></c>
+      <c r="F4" s="3" t="inlineStr"><is><t>RECORTES AUSENTES</t></is></c>
+      <c r="G4" s="3" t="inlineStr"><is><t>JUSTIFICATIVA DA ABORDAGEM</t></is></c>
+      <c r="H4" s="3" t="inlineStr"><is><t>ORIENTAÇÃO TEMÁTICA</t></is></c>
+      <c r="I4" s="3" t="inlineStr"><is><t>COMPETÊNCIA II</t></is></c>
+      <c r="J4" s="3" t="inlineStr"><is><t>NOTA FINAL</t></is></c>
+    </row>`;
+
+    let devRow = 5;
+    for (const est of correcoes) {
+      const iema = this.escapeXml(est.iema_pleno || iemaPlenoDefault);
+      const turma = this.escapeXml(est.turma || turmaDefault);
+      const nome = this.escapeXml(est.nome_estudante);
+      const tema = this.escapeXml(est.tema || 'Tema não informado');
+      const abordagem = est.relatorio_pedagogico?.abordagemTema;
+      const classif = this.escapeXml(abordagem?.classificacao || 'Abordagem completa');
+      const recortes = this.escapeXml(
+        abordagem?.recortesAusentes && abordagem.recortesAusentes.length > 0
+          ? abordagem.recortesAusentes.join('; ')
+          : 'Nenhum recorte ausente'
+      );
+      const justif = this.escapeXml(abordagem?.justificativa || est.c2_justificativa || 'Abordagem temática completa.');
+      const orient = this.escapeXml(abordagem?.orientacao || 'Mantenha a articulação do tema com o projeto de texto.');
+      const c2 = Number(est.c2_final) || 0;
+      const notaFinal = Number(est.nota_final) || 0;
+
+      sheet3Xml += `
+    <row r="${devRow}" ht="20" customHeight="1">
+      <c r="A${devRow}" s="4" t="inlineStr"><is><t>${iema}</t></is></c>
+      <c r="B${devRow}" s="5" t="inlineStr"><is><t>${turma}</t></is></c>
+      <c r="C${devRow}" s="4" t="inlineStr"><is><t>${nome}</t></is></c>
+      <c r="D${devRow}" s="4" t="inlineStr"><is><t>${tema}</t></is></c>
+      <c r="E${devRow}" s="5" t="inlineStr"><is><t>${classif}</t></is></c>
+      <c r="F${devRow}" s="4" t="inlineStr"><is><t>${recortes}</t></is></c>
+      <c r="G${devRow}" s="4" t="inlineStr"><is><t>${justif}</t></is></c>
+      <c r="H${devRow}" s="4" t="inlineStr"><is><t>${orient}</t></is></c>
+      <c r="I${devRow}" s="5"><v>${c2}</v></c>
+      <c r="J${devRow}" s="5"><v>${notaFinal}</v></c>
+    </row>`;
+      devRow++;
+    }
+
+    sheet3Xml += `
+  </sheetData>
+  <mergeCells count="2">
+    <mergeCell ref="A1:J1"/>
+    <mergeCell ref="A2:J2"/>
+  </mergeCells>
+</worksheet>`;
+    zip.file('xl/worksheets/sheet3.xml', sheet3Xml);
+
+    // 10. xl/worksheets/sheet4.xml (Aba complementar 'Sobre' com identificação detalhada)
+    const sheet4Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <cols>
     <col min="1" max="1" width="32" customWidth="1"/>
@@ -311,9 +393,9 @@ export class ExcelOficialGenerator {
     <mergeCell ref="A2:B2"/>
   </mergeCells>
 </worksheet>`;
-    zip.file('xl/worksheets/sheet3.xml', sheet3Xml);
+    zip.file('xl/worksheets/sheet4.xml', sheet4Xml);
 
-    // 10. Gera o blob binário do arquivo .xlsx
+    // 11. Gera o blob binário do arquivo .xlsx
     const blob = await zip.generateAsync({
       type: 'blob',
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

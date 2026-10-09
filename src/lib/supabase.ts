@@ -2,8 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Obtém as credenciais das variáveis de ambiente ou do localStorage (para configuração direta no navegador)
 export const getSupabaseCredentials = () => {
-  const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const envUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || '';
+  const envKey = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || '';
 
   const localUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('redacao_supabase_url') || '' : '';
   const localKey = typeof localStorage !== 'undefined' ? localStorage.getItem('redacao_supabase_key') || '' : '';
@@ -104,4 +104,6 @@ ON public.correcoes FOR UPDATE TO authenticated USING (auth.uid() = user_id) WIT
 DROP POLICY IF EXISTS "Professores excluem apenas suas proprias correcoes" ON public.correcoes;
 CREATE POLICY "Professores excluem apenas suas proprias correcoes" 
 ON public.correcoes FOR DELETE TO authenticated USING (auth.uid() = user_id);
+
+ALTER TABLE public.correcoes ADD COLUMN IF NOT EXISTS professor_nome TEXT;
 `;

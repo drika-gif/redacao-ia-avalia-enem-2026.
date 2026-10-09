@@ -147,7 +147,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-bold text-xs flex items-center justify-center border border-brand-200">
               C1
             </div>
             <div>
@@ -185,7 +185,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-bold text-xs flex items-center justify-center border border-brand-200">
               C2
             </div>
             <div>
@@ -209,6 +209,12 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
             Sugestão da IA Gemini: <span className="font-bold text-brand-700">{c2Sugerida}</span>
           </p>
           <p className="text-slate-600 mt-1">{c2Justificativa}</p>
+          {c2Justificativa.toLowerCase().includes('tangenciamento') && (
+            <div className="mt-2.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] font-medium flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span><strong>Tangenciamento identificado:</strong> corresponde ao nível de 80 pontos na Competência II conforme a rubrica oficial.</span>
+            </div>
+          )}
         </div>
 
         <div className="mt-3">
@@ -223,7 +229,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-bold text-xs flex items-center justify-center border border-brand-200">
               C3
             </div>
             <div>
@@ -261,7 +267,7 @@ export const CompetenceScorer: React.FC<CompetenceScorerProps> = ({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-200">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-bold text-xs flex items-center justify-center border border-brand-200">
               C4
             </div>
             <div>

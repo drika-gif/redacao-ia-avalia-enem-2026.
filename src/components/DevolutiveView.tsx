@@ -112,6 +112,108 @@ export const DevolutiveView: React.FC<DevolutiveViewProps> = ({
           </div>
         </div>
 
+        {/* Seção de Avaliação: Abordagem do Tema (ENEM 2026) */}
+        {dev.abordagemTema && (
+          <div className="bg-slate-50/70 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="w-5 h-5 text-brand-700" />
+                <h5 className="font-extrabold text-slate-900 text-sm uppercase tracking-wide">
+                  Abordagem do Tema
+                </h5>
+              </div>
+              <div>
+                <span
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase shadow-sm ${
+                    dev.abordagemTema.classificacao === 'Abordagem completa'
+                      ? 'bg-green-100 text-green-900 border border-green-300'
+                      : dev.abordagemTema.classificacao === 'Tangenciamento'
+                      ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                      : dev.abordagemTema.classificacao === 'Fuga total'
+                      ? 'bg-red-100 text-red-950 border border-red-300'
+                      : 'bg-slate-200 text-slate-800 border border-slate-300'
+                  }`}
+                >
+                  {dev.abordagemTema.classificacao === 'Tangenciamento' && '⚠️ '}
+                  {dev.abordagemTema.classificacao === 'Fuga total' && '🚫 '}
+                  {dev.abordagemTema.classificacao === 'Abordagem completa' && '✓ '}
+                  {dev.abordagemTema.classificacao}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <span className="text-slate-400 font-bold uppercase text-[10px] block">
+                  Frase-tema da Proposta:
+                </span>
+                <p className="font-bold text-slate-800 text-sm mt-0.5">
+                  "{dev.abordagemTema.fraseTema || correcao.tema || 'Tema não informado'}"
+                </p>
+              </div>
+
+              {/* Justificativa Pedagógica com formulação respeitosa */}
+              <div
+                className={`p-3.5 rounded-xl border leading-relaxed ${
+                  dev.abordagemTema.classificacao === 'Tangenciamento'
+                    ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                    : dev.abordagemTema.classificacao === 'Fuga total'
+                    ? 'bg-red-50/90 border-red-300 text-red-950'
+                    : 'bg-white border-slate-200 text-slate-700'
+                }`}
+              >
+                <span className="font-bold block text-[11px] mb-1">
+                  Justificativa da Abordagem:
+                </span>
+                <p className="whitespace-pre-wrap">{dev.abordagemTema.justificativa}</p>
+              </div>
+
+              {/* Elementos Desenvolvidos e Recortes Ausentes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {dev.abordagemTema.elementosDesenvolvidos && dev.abordagemTema.elementosDesenvolvidos.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-3">
+                    <span className="font-bold text-green-800 text-[11px] block mb-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                      <span>Elementos do tema desenvolvidos:</span>
+                    </span>
+                    <ul className="space-y-1 text-slate-600 pl-4 list-disc text-[11px]">
+                      {dev.abordagemTema.elementosDesenvolvidos.map((el, i) => (
+                        <li key={i}>{el}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {dev.abordagemTema.recortesAusentes && dev.abordagemTema.recortesAusentes.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-xl p-3">
+                    <span className="font-bold text-amber-800 text-[11px] block mb-1.5 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                      <span>Recortes ausentes ou parciais:</span>
+                    </span>
+                    <ul className="space-y-1 text-slate-600 pl-4 list-disc text-[11px]">
+                      {dev.abordagemTema.recortesAusentes.map((rec, i) => (
+                        <li key={i}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Orientação Objetiva para o Estudante */}
+              {dev.abordagemTema.orientacao && (
+                <div className="bg-brand-50/70 border border-brand-200 rounded-xl p-3 text-brand-950">
+                  <span className="font-bold text-[11px] block mb-0.5 text-brand-800">
+                    Orientação para o Estudante:
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-brand-900">
+                    {dev.abordagemTema.orientacao}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Quadro Resumo das 5 Competências */}
         <div>
           <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -158,12 +260,12 @@ export const DevolutiveView: React.FC<DevolutiveViewProps> = ({
             </ul>
           </div>
 
-          <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4">
-            <h5 className="font-extrabold text-blue-900 text-xs uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
+          <div className="bg-brand-50/60 border border-brand-200 rounded-xl p-4">
+            <h5 className="font-extrabold text-brand-900 text-xs uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
               <Sparkles className="w-4 h-4 text-brand-600" />
               <span>Oportunidades de Melhoria</span>
             </h5>
-            <ul className="space-y-1.5 text-xs text-blue-950">
+            <ul className="space-y-1.5 text-xs text-brand-950">
               {dev.precisaMelhorar.map((item, idx) => (
                 <li key={idx} className="flex items-start gap-1.5">
                   <span className="text-brand-600 font-bold">•</span>

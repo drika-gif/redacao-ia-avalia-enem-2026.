@@ -37,3 +37,4 @@ CREATE POLICY correcoes_select_owner ON public.correcoes FOR SELECT TO authentic
 CREATE POLICY correcoes_insert_owner ON public.correcoes FOR INSERT TO authenticated WITH CHECK((select auth.uid())=user_id);
 CREATE POLICY correcoes_update_owner ON public.correcoes FOR UPDATE TO authenticated USING((select auth.uid())=user_id) WITH CHECK((select auth.uid())=user_id);
 CREATE POLICY correcoes_delete_owner ON public.correcoes FOR DELETE TO authenticated USING((select auth.uid())=user_id);
+ALTER TABLE public.correcoes ADD COLUMN IF NOT EXISTS professor_nome text;

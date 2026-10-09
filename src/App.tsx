@@ -49,7 +49,7 @@ export const AppContent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-brand-700 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
@@ -75,7 +75,7 @@ export const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-white flex flex-col font-sans">
       <Navbar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}

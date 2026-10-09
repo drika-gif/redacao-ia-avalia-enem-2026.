@@ -10,7 +10,8 @@ import {
   DevolutivaPedagogica 
 } from '../types';
 import { analisarComIA } from '../lib/ai';
-import { DbService } from '../lib/db';
+import { DbService, DbError, DbErrorCategory } from '../lib/db';
+import { generateUUID } from '../lib/uuid';
 import { ImageViewer } from '../components/ImageViewer';
 import { TranscriptionView } from '../components/TranscriptionView';
 import { ZeroAlertModal } from '../components/ZeroAlertModal';
@@ -63,6 +64,16 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   const [zeroData, setZeroData] = useState<PossivelNotaZero | null>(null);
   const [showZeroModal, setShowZeroModal] = useState(false);
   const [isNotaZeroConfirmada, setIsNotaZeroConfirmada] = useState(false);
+
+  // Identificador único e estável da correção atual (evita duplicações em tentativas consecutivas)
+  const [recordId, setRecordId] = useState<string>(() => generateUUID());
+
+  // Estado de erro detalhado para feedback claro e não obstrutivo
+  const [salvarErro, setSalvarErro] = useState<{
+    title: string;
+    message: string;
+    category: DbErrorCategory;
+  } | null>(null);
 
   // Competências
   const [c1Sugerida, setC1Sugerida] = useState<CompetenciaScore>(160);
@@ -246,9 +257,11 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
       return;
     }
 
+    setSalvarErro(null);
     setSalvando(true);
     try {
       const nova: Partial<Correcao> = {
+        id: recordId,
         iema_pleno: iemaPleno.trim(),
         turma: turma.trim(),
         nome_estudante: estudante.trim(),
@@ -276,10 +289,39 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
         professor_nome: user?.nome || undefined,
       };
 
-      await DbService.save(nova as Correcao, user?.id || null);
+      const salvo = await DbService.save(nova as Correcao, user?.id || null);
+      if (salvo && salvo.id) {
+        setRecordId(salvo.id);
+      }
       setSalvoComSucesso(true);
     } catch (err: any) {
-      alert(`Falha ao salvar correção: ${err.message}`);
+      let category: DbErrorCategory = 'SERVER_ERROR';
+      let title = 'Erro ao Salvar na Nuvem';
+      let message = err?.message || 'Falha ao salvar a correção na nuvem.';
+
+      if (err instanceof DbError) {
+        category = err.category;
+        if (category === 'CONNECTION_ERROR') {
+          title = 'Falha de Conexão com a Internet';
+        } else if (category === 'SESSION_EXPIRED') {
+          title = 'Sessão de Acesso Expirada';
+        } else if (category === 'VALIDATION_ERROR') {
+          title = 'Dados Inválidos ou Incompletos';
+        } else {
+          title = 'Erro no Servidor do Banco de Dados';
+        }
+      } else {
+        const msgLow = (err?.message || '').toLowerCase();
+        if (msgLow.includes('conexão') || msgLow.includes('rede') || msgLow.includes('fetch')) {
+          category = 'CONNECTION_ERROR';
+          title = 'Falha de Conexão com a Internet';
+        } else if (msgLow.includes('sessão') || msgLow.includes('jwt') || msgLow.includes('token') || msgLow.includes('autoriza')) {
+          category = 'SESSION_EXPIRED';
+          title = 'Sessão de Acesso Expirada';
+        }
+      }
+
+      setSalvarErro({ title, message, category });
     } finally {
       setSalvando(false);
     }
@@ -287,6 +329,8 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
 
   // Corrigir Próxima Redação
   const handleCorrigirProxima = () => {
+    setRecordId(generateUUID());
+    setSalvarErro(null);
     setEstudante('');
     setImagens([]);
     setTranscricao('');
@@ -517,12 +561,12 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
 
               {/* Mensagem de Carregamento da IA */}
               {analisando && (
-                <div role="status" className="p-4 sm:p-5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-2 animate-pulse">
-                  <div className="flex items-center gap-2 font-bold text-sm text-blue-950">
-                    <Sparkles className="w-5 h-5 text-blue-600 animate-spin" />
+                <div role="status" className="p-4 sm:p-5 rounded-2xl bg-brand-50 border border-brand-200 text-brand-900 text-xs space-y-2 animate-pulse">
+                  <div className="flex items-center gap-2 font-bold text-sm text-brand-950">
+                    <Sparkles className="w-5 h-5 text-brand-600 animate-spin" />
                     <span>Lendo caligrafia e analisando redação diretamente pela foto...</span>
                   </div>
-                  <p className="text-blue-800">
+                  <p className="text-brand-800">
                     O Gemini está transcrevendo o manuscrito e avaliando as 5 competências do ENEM 2026. Isso pode levar alguns segundos.
                   </p>
                 </div>
@@ -798,6 +842,50 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
                     </div>
                   </label>
                 </div>
+
+                {/* Banner de Erro Diferenciado com Ação de Repetir */}
+                {salvarErro && (
+                  <div
+                    role="alert"
+                    className={`p-4 rounded-2xl border flex items-start gap-3 transition animate-fadeIn ${
+                      salvarErro.category === 'CONNECTION_ERROR'
+                        ? 'bg-amber-50 border-amber-200 text-amber-950'
+                        : salvarErro.category === 'SESSION_EXPIRED'
+                        ? 'bg-rose-50 border-rose-200 text-rose-950'
+                        : salvarErro.category === 'VALIDATION_ERROR'
+                        ? 'bg-orange-50 border-orange-200 text-orange-950'
+                        : 'bg-red-50 border-red-200 text-red-950'
+                    }`}
+                  >
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 text-current" />
+                    <div className="flex-1 text-xs space-y-1">
+                      <p className="font-extrabold text-sm">{salvarErro.title}</p>
+                      <p className="leading-relaxed">{salvarErro.message}</p>
+                      <p className="text-[11px] opacity-80 pt-0.5 font-medium">
+                        ✓ A correção, identificação e notas foram mantidas na tela para você tentar novamente sem refazer a análise.
+                      </p>
+                      <div className="pt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSalvarCorrecao}
+                          disabled={salvando}
+                          className="px-4 py-2 bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
+                        >
+                          <span>🔄 Tentar Salvar Novamente</span>
+                        </button>
+                        {salvarErro.category === 'SESSION_EXPIRED' && (
+                          <button
+                            type="button"
+                            onClick={() => window.open(window.location.origin, '_blank')}
+                            className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 font-bold rounded-xl border border-slate-200 transition text-xs"
+                          >
+                            Abrir Login em Nova Aba
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center pt-2">
                   <button

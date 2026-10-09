@@ -132,7 +132,7 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+    <div className="min-h-screen bg-white flex flex-col justify-between">
       <div className="flex-1 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
         {/* Top Banner de Privacidade */}
         <div className="text-center mb-6">

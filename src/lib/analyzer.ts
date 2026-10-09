@@ -1,10 +1,11 @@
-import {
+import type {
   CompetenciaScore,
   PossivelNotaZero,
   QuadroC5,
   AnaliseCompetencia,
-  DevolutivaPedagogica
-} from '../types';
+  DevolutivaPedagogica,
+  AbordagemTema
+} from '../types/index.ts';
 
 export class AnalisadorAvaliaEnem2026 {
   /**
@@ -189,14 +190,135 @@ export class AnalisadorAvaliaEnem2026 {
   }
 
   /**
-   * 4. ANÁLISE DA COMPETÊNCIA II (Compreensão do Tema e Repertório Sociocultural)
+   * 4. AVALIAÇÃO DA ABORDAGEM DO TEMA (TANGENCIAMENTO, FUGA TOTAL E ABORDAGEM COMPLETA)
+   * Rubrica oficial:
+   * - Abordagem completa: desenvolve o tema e seus recortes centrais
+   * - Tangenciamento: desenvolve apenas o assunto amplo/parte do tema (C2 = 80 pontos)
+   * - Fuga total: não desenvolve o tema proposto (C2 = 0 pontos / nota zero total)
+   */
+  static avaliarAbordagemTema(texto: string, tema: string): AbordagemTema {
+    const rawTema = (tema || '').trim();
+    if (!rawTema) {
+      return {
+        fraseTema: '',
+        classificacao: 'Pendente',
+        elementosDesenvolvidos: [],
+        recortesAusentes: ['Frase-tema não informada'],
+        justificativa: 'Frase-tema não informada. Solicite a proposta de redação para que a avaliação temática e a nota final sejam atribuídas.',
+        orientacao: 'Informe a proposta de redação completa.',
+      };
+    }
+
+    const rawTexto = (texto || '').trim();
+    if (!rawTexto) {
+      return {
+        fraseTema: rawTema,
+        classificacao: 'Fuga total',
+        elementosDesenvolvidos: [],
+        recortesAusentes: [rawTema],
+        justificativa: 'Nenhum texto foi submetido para avaliação da proposta temática.',
+        orientacao: 'Escreva a redação com base na proposta temática fornecida.',
+      };
+    }
+
+    // Extrai palavras-chave e recortes da frase-tema
+    const stopwords = new Set([
+      'o', 'a', 'os', 'as', 'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas',
+      'para', 'por', 'com', 'e', 'ou', 'se', 'um', 'uma', 'seu', 'sua', 'seus', 'suas', 'como', 'sobre', 'ao', 'aos', 'à', 'às'
+    ]);
+
+    const palavrasTema = rawTema
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .match(/[a-z0-9]+/g)
+      ?.filter((w) => w.length > 2 && !stopwords.has(w)) || [];
+
+    const normTexto = rawTexto
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    const encontradas = palavrasTema.filter((w) => normTexto.includes(w));
+    const taxaCobertura = palavrasTema.length > 0 ? encontradas.length / palavrasTema.length : 0;
+
+    // Fuga total: nenhum conceito essencial presente
+    if (encontradas.length === 0 && rawTexto.length > 50) {
+      return {
+        fraseTema: rawTema,
+        classificacao: 'Fuga total',
+        elementosDesenvolvidos: [],
+        recortesAusentes: [rawTema],
+        justificativa: `O texto não desenvolve o tema proposto ("${rawTema}"). Nenhum dos conceitos centrais da proposta foi abordado ao longo da redação, configurando Fuga Total ao Tema.`,
+        orientacao: 'Leia atentamente a proposta e certifique-se de que sua tese e argumentos se referem diretamente à frase-tema apresentada.',
+      };
+    }
+
+    // Tangenciamento: desenvolve apenas o assunto geral ou parte do tema, deixando recorte central ausente
+    if (taxaCobertura < 0.5 && palavrasTema.length >= 2) {
+      const ausentes = palavrasTema.filter((w) => !normTexto.includes(w));
+      const recorteAusenteDesc = ausentes.join(', ');
+      return {
+        fraseTema: rawTema,
+        classificacao: 'Tangenciamento',
+        elementosDesenvolvidos: encontradas.map(w => `Abordagem parcial relacionada a "${w}"`),
+        recortesAusentes: ausentes.map(w => `Recorte central "${w}" ausente`),
+        justificativa: `O texto aborda o assunto geral, mas não desenvolve suficientemente o recorte solicitado na proposta: a discussão específica sobre ${recorteAusenteDesc}. Embora o estudante tangencie o campo temático, não aprofundou a especificidade exigida pela frase-tema.`,
+        orientacao: 'Para evitar o tangenciamento, assegure-se de que todos os recortes da frase-tema estejam explicitamente presentes já na introdução e sejam desdobrados nos parágrafos de desenvolvimento.',
+      };
+    }
+
+    // Abordagem completa
+    return {
+      fraseTema: rawTema,
+      classificacao: 'Abordagem completa',
+      elementosDesenvolvidos: palavrasTema.map(w => `Desenvolvimento do conceito central "${w}"`),
+      recortesAusentes: [],
+      justificativa: `Abordagem completa: o texto desenvolve a frase-tema em sua integralidade ("${rawTema}"), contemplando seus recortes centrais e problematizando o tema ao longo da argumentação.`,
+      orientacao: 'Mantenha a articulação consistente entre o tema central e o repertório sociocultural produtivo em todas as etapas do texto.',
+    };
+  }
+
+  /**
+   * 5. ANÁLISE DA COMPETÊNCIA II (Compreensão do Tema e Repertório Sociocultural)
    */
   static analisarC2(texto: string, tema: string): AnaliseCompetencia {
     const raw = (texto || '').trim();
     const erros: string[] = [];
     const trechos: { trecho: string; explicacao: string }[] = [];
 
-    // Busca de repertório sociocultural legitimado
+    const abordagem = this.avaliarAbordagemTema(texto, tema);
+
+    if (abordagem.classificacao === 'Pendente') {
+      return {
+        sugerida: 0,
+        justificativa: 'Avaliação da Competência II pendente: frase-tema não informada.',
+        erros: ['Frase-tema ausente.'],
+        trechos: [],
+        orientacao: 'Informe a proposta temática para concluir a avaliação da Competência II.',
+      };
+    }
+
+    if (abordagem.classificacao === 'Fuga total') {
+      return {
+        sugerida: 0,
+        justificativa: abordagem.justificativa,
+        erros: ['Fuga total ao tema.'],
+        trechos: [],
+        orientacao: abordagem.orientacao,
+      };
+    }
+
+    // Rubrica oficial: tangenciamento corresponde estritamente ao nível de 80 pontos na Competência II
+    if (abordagem.classificacao === 'Tangenciamento') {
+      return {
+        sugerida: 80,
+        justificativa: abordagem.justificativa,
+        erros: ['Tangenciamento do tema: desenvolvimento apenas do assunto amplo sem o recorte central.'],
+        trechos: [{ trecho: tema, explicacao: 'Recorte solicitado na proposta que não foi devidamente desenvolvido.' }],
+        orientacao: abordagem.orientacao,
+      };
+    }
+
+    // Abordagem completa: avalia repertório sociocultural legitimado
     const repertoriosConhecidos = [
       'constitui[çc][ãa]o',
       'dimenstein',
@@ -459,11 +581,14 @@ export class AnalisadorAvaliaEnem2026 {
       },
     ];
 
+    const abordagemTema = this.avaliarAbordagemTema(texto, tema);
+
     return {
       pontosFortes,
       precisaMelhorar,
       errosCategorizados,
       trechosParaRevisar,
+      abordagemTema,
     };
   }
 }
