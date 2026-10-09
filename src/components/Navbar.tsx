@@ -11,6 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { AUTHORSHIP } from '../constants/authorship';
+import { usePwa } from '../context/PwaContext';
 
 interface NavbarProps {
   currentTab: string;
@@ -20,6 +21,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, totalCorrecoes }) => {
   const { user, signOut } = useAuth();
+  const { isInstallable, promptInstall } = usePwa();
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -122,6 +124,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, totalCo
 
           {/* Área do Usuário / Professora */}
           <div className="flex items-center gap-2">
+            {isInstallable && (
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 transition shadow-xs"
+                title="Instalar aplicativo Redação IA no dispositivo"
+              >
+                <Download className="w-3.5 h-3.5 text-brand-600" />
+                <span>Instalar aplicativo</span>
+              </button>
+            )}
+
             <button
               onClick={() => onSelectTab('minha-conta')}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
@@ -193,6 +207,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, totalCo
           >
             Exportar XLSX
           </button>
+          {isInstallable && (
+            <button
+              type="button"
+              onClick={promptInstall}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 flex items-center gap-1 shadow-xs"
+            >
+              <Download className="w-3 h-3 text-brand-600" />
+              <span>Instalar app</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

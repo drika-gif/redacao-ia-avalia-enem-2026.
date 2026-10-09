@@ -14,9 +14,13 @@ import { EssaysListPage } from './pages/EssaysListPage';
 import { ClassSpreadsheetPage } from './pages/ClassSpreadsheetPage';
 import { GenerateSpreadsheetPage } from './pages/GenerateSpreadsheetPage';
 import { MyAccountPage } from './pages/MyAccountPage';
+import { usePwa } from './context/PwaContext';
+import { InstallAppModal } from './components/InstallAppModal';
+import { WifiOff } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
   const { user, loading, isRecoveryMode, setIsRecoveryMode } = useAuth();
+  const { isOnline } = usePwa();
   const [currentTab, setCurrentTab] = useState<string>('inicio');
   const [correcoes, setCorrecoes] = useState<Correcao[]>([]);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
@@ -64,18 +68,31 @@ export const AppContent: React.FC = () => {
   if (!user) {
     return (
       <>
+        {!isOnline && (
+          <div role="status" className="bg-amber-600 text-white text-xs font-bold py-2 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
+            <WifiOff className="w-4 h-4 flex-shrink-0" />
+            <span>Sem conexão com a internet. A análise por IA e o salvamento na nuvem exigem conexão ativa.</span>
+          </div>
+        )}
         <AuthPage />
         <ResetPasswordModal
           isOpen={isRecoveryMode}
           onClose={() => setIsRecoveryMode(false)}
           canCancel={true}
         />
+        <InstallAppModal />
       </>
     );
   }
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
+      {!isOnline && (
+        <div role="status" className="bg-amber-600 text-white text-xs font-bold py-2 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
+          <WifiOff className="w-4 h-4 flex-shrink-0" />
+          <span>Sem conexão com a internet. A análise por IA e o salvamento na nuvem exigem conexão ativa.</span>
+        </div>
+      )}
       <Navbar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -133,6 +150,9 @@ export const AppContent: React.FC = () => {
 
       {/* Modal Sobre o Aplicativo */}
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+
+      {/* Modal de Instalação PWA */}
+      <InstallAppModal />
     </div>
   );
 };

@@ -134,6 +134,10 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   // 2. Análise DIRETA PELA FOTO (sem exigir transcrição digitada prévia)
   const handleAnalisarDiretoPelaFoto = async () => {
     if (analisando || imagens.length === 0) return;
+    if (!navigator.onLine) {
+      setErroAnalise('Sem conexão com a internet. A análise de redações por inteligência artificial exige conexão ativa. Conecte-se à rede e tente novamente.');
+      return;
+    }
     setAnalisando(true);
     setErroAnalise('');
     setShowNovaFotoAviso(false);
@@ -192,6 +196,10 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   // 3. Análise a partir da transcrição (fluxo manual opcional)
   const handleConfirmarTranscricao = async () => {
     if (analisando || !transcricao.trim()) return;
+    if (!navigator.onLine) {
+      setErroAnalise('Sem conexão com a internet. A análise de redações por inteligência artificial exige conexão ativa. Conecte-se à rede e tente novamente.');
+      return;
+    }
     setAnalisando(true);
     setErroAnalise('');
     setShowNovaFotoAviso(false);
@@ -254,6 +262,15 @@ export const NewCorrectionPage: React.FC<NewCorrectionPageProps> = ({ onSaved, i
   const handleSalvarCorrecao = async () => {
     if (!confirmouRevisao) {
       alert('Por favor, marque a caixa confirmando a revisão das notas antes de salvar.');
+      return;
+    }
+
+    if (!navigator.onLine) {
+      setSalvarErro({
+        category: 'CONNECTION_ERROR',
+        title: 'Sem Conexão com a Internet',
+        message: 'A gravação na nuvem exige conexão ativa com a rede. Suas notas e a devolutiva permanecem salvas na tela. Conecte-se e tente salvar novamente.'
+      });
       return;
     }
 

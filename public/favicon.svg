@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#6D28D9" />
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#3B0764" flood-opacity="0.35" />
+    </filter>
+    <filter id="pencilShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="4" dy="8" stdDeviation="10" flood-color="#2E1065" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Fundo Lilás -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Folha Branca de Redação com Canto Dobrado -->
+  <g filter="url(#cardShadow)">
+    <path d="M 136 100 
+             L 316 100 
+             L 376 160 
+             L 376 400 
+             A 28 28 0 0 1 348 428 
+             L 164 428 
+             A 28 28 0 0 1 136 400 
+             Z" 
+          fill="#FFFFFF" />
+    <!-- Dobra da Folha -->
+    <path d="M 316 100 L 316 150 A 10 10 0 0 0 326 160 L 376 160 Z" fill="#E9D5FF" />
+  </g>
+
+  <!-- Linhas de Correção Pedagógica na Folha -->
+  <rect x="176" y="200" width="160" height="14" rx="7" fill="#7C3AED" />
+  <rect x="176" y="236" width="140" height="14" rx="7" fill="#7C3AED" />
+  <!-- Traço Ondulado / Destaque de Correção -->
+  <path d="M 176 280 Q 200 270, 224 284 T 272 280 T 310 282" fill="none" stroke="#C084FC" stroke-width="10" stroke-linecap="round" />
+  <rect x="176" y="316" width="120" height="14" rx="7" fill="#7C3AED" />
+
+  <!-- Selo de Avaliação Positiva (Verde) -->
+  <g filter="url(#cardShadow)">
+    <circle cx="376" cy="160" r="44" fill="#10B981" />
+    <!-- Visto Branco -->
+    <path d="M 358 160 L 370 172 L 396 146" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <!-- Lápis de Correção em Perspectiva -->
+  <g filter="url(#pencilShadow)" transform="rotate(-38 340 330)">
+    <!-- Corpo do Lápis -->
+    <rect x="310" y="210" width="48" height="190" rx="14" fill="#C4B5FD" />
+    <rect x="326" y="210" width="16" height="190" fill="#A78BFA" />
+    <!-- Borracha / Topo -->
+    <rect x="310" y="200" width="48" height="24" rx="8" fill="#4C1D95" />
+    <rect x="310" y="220" width="48" height="8" fill="#E2E8F0" />
+    <!-- Madeira Apontada -->
+    <polygon points="310,400 358,400 334,446" fill="#FDE68A" />
+    <!-- Grafite / Ponta Roxa de Correção -->
+    <polygon points="326,432 342,432 334,446" fill="#5B21B6" />
+  </g>
+</svg>
